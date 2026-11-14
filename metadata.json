@@ -1,0 +1,81 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M7DQB16WBBMKEPJZYGC9GDA7",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 5,
+  "files_touched": [
+    ".env.example",
+    "agent/.env.example",
+    "agent/README.md",
+    "agent/agent.mjs",
+    "agent/package.json",
+    "backend/app/api/chert.py",
+    "backend/app/api/health.py",
+    "backend/app/config.py",
+    "backend/app/integrations/chert.py",
+    "backend/app/integrations/chert_shared.py",
+    "backend/app/main.py",
+    "backend/app/models/dashboard.py",
+    "backend/app/repositories/messaging.py",
+    "backend/app/services/brief.py",
+    "backend/app/services/dashboard.py",
+    "backend/app/services/demo_service.py",
+    "backend/app/services/outreach.py",
+    "backend/tests/conftest.py",
+    "backend/tests/test_api_demo.py",
+    "backend/tests/test_brief.py",
+    "backend/tests/test_chert_shared.py",
+    "docs/api.md",
+    "docs/chert-status.md",
+    "docs/demo-script.md",
+    "frontend/src/App.tsx",
+    "frontend/src/components/ActionPanel.tsx",
+    "frontend/src/components/BriefPanel.test.tsx",
+    "frontend/src/components/BriefPanel.tsx",
+    "frontend/src/components/CoordinationFeed.tsx",
+    "frontend/src/components/TechnicalPanel.tsx",
+    "frontend/src/hooks/useDemo.ts",
+    "frontend/src/services/api.ts",
+    "frontend/src/types/dashboard.ts",
+    "scripts/chert_inspect.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 294,
+    "cache_creation_tokens": 285803,
+    "cache_read_tokens": 56935958,
+    "output_tokens": 173758,
+    "api_call_count": 142,
+    "subagent_tokens": {
+      "input_tokens": 12,
+      "cache_creation_tokens": 32921,
+      "cache_read_tokens": 76812,
+      "output_tokens": 6058,
+      "api_call_count": 6
+    },
+    "subagent_tokens_complete": true
+  },
+  "redaction": {
+    "replacements": 62,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 55,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 7,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
