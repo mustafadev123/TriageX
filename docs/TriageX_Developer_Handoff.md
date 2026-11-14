@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | Repository | `https://github.com/mustafadev123/TriageX` (branch `main`) |
-| Code baseline audited | `8c3be995d0d4073e8af745bdc93c92d4b415ec68` (`8c3be99`, 2026-11-14) |
+| Code baseline audited | `8c3be995d0d4073e8af745bdc93c92d4b415ec68` (`8c3be99`, 2026-11-14). Later commits change documentation only. |
 | Audience | A teammate continuing development on **macOS** with **Claude Code** and an **iPhone** |
 | Target | EmoryHacks 2026 Healthcare Track, plus the **Chert Best Use of FaceTime** sponsor prize |
 | Data | **Everything is synthetic.** No real hospital, patient or staff data exists anywhere in this project. |
@@ -30,13 +30,14 @@
 7. Chert integration: what exists and what must change
 8. macOS and iPhone setup
 9. Accounts, credentials and environment variables
-10. Remaining implementation roadmap (Stages A–G)
-11. Copy-paste Claude Code prompts (Prompts 0–8)
+10. Remaining implementation roadmap (Stages A–G, optional H)
+11. Copy-paste Claude Code prompts (Prompts 0–8, optional Stage H)
 12. 90-second demonstration script
 13. Fictional staff-card specification
 14. Troubleshooting
 15. Final acceptance checklist
-16. References
+16. Patient Navigation — Original Scope, MVP Cut, and Future Vision
+17. References
 
 ---
 
@@ -64,6 +65,28 @@ for live channels, and the AI operational brief (Phase 5).
 **Your goal:** a real FaceTime call in which the TriageX agent sees a fictional staff card through the
 iPhone camera, checks it against a synthetic roster, asks for explicit confirmation, and records the
 confirmation through the existing backend so the two futures diverge after the 45-minute lead time.
+
+### 1.1 Final scope decisions (agreed by the team, 2026-11-14)
+
+The core product does not change. TriageX remains an AI-powered emergency-department surge response
+system: it predicts overcrowding, recommends interventions, obtains human approval, coordinates
+staffing, and demonstrates the impact through a deterministic simulation.
+
+1. **Keep unchanged:** the simulation, Tiger Data integration, FastAPI backend, dashboard, and the
+   baseline-versus-TriageX comparison.
+2. **Chert FaceTime extends the existing staff outreach and confirmation workflow.** It is not a
+   separate product.
+3. **The FaceTime agent:**
+   - uses genuine live video to read a fictional staff availability card;
+   - checks it against a synthetic roster;
+   - obtains explicit verbal confirmation;
+   - triggers the existing staffing confirmation service.
+4. **iMessage stays** as a practical staffing channel and as the fallback.
+5. **Patient navigation** was a secondary, text-based feature in the original brief and was
+   deliberately cut from the MVP. It is documented as future work (Section 16).
+6. **Patient-facing FaceTime and visual injury assessment** are new, unimplemented proposals. Do not
+   build them during the hackathon, and do not present them as original requirements.
+7. **The simulation's underlying logic must not be modified** to accommodate FaceTime.
 
 ---
 
@@ -94,6 +117,16 @@ Commit history (oldest first):
 | `ced3174` | feat: add TriageX command-center dashboard | Phase 7a/7b dashboard |
 | `974fb03` | dashboard_Done | **Despite the name, this is the Phase 6 Chert iMessage backend** (client, outreach service, webhook endpoint, migration 003) |
 | `8c3be99` | i_message_done | Phase 6 tests (`tests/test_chert.py`), `scripts/chert_setup.py`, dedup fix |
+| `869e2fe`, `aec3156` and later | docs: … | This handoff (Markdown, PDF, diagrams) and the Entire setup section. **No code changes.** |
+
+**Re-audit before the final push:**
+- The working tree was clean, and `main` equalled `origin/main`.
+- All seven Phase 6 files are on GitHub with no local differences:
+  - `backend/app/integrations/chert.py`, `backend/app/services/outreach.py`,
+    `backend/app/api/chert.py`;
+  - `backend/app/repositories/messaging.py`, `db/migrations/003_messaging.sql`;
+  - `backend/tests/test_chert.py`, `scripts/chert_setup.py`.
+- The test results in Section 2.3 were reproduced.
 
 ### 2.2 Code on GitHub vs. local-only
 
@@ -101,7 +134,7 @@ Commit history (oldest first):
 |---|---|
 | All application code, tests, migrations, docs and screenshots | **On GitHub** at `8c3be99` |
 | `.env` (Tiger Data connection string) | **Local only, on the original laptop. Never committed.** Must be shared privately (Section 9) or replaced with your own Tiger service. |
-| This handoff (`docs/TriageX_Developer_Handoff.md`, `.pdf`, `docs/handoff/*.svg`) | Added after `8c3be99`. It is on GitHub only once the project owner commits it. If you are reading it from the repository, it has been committed. |
+| This handoff (`docs/TriageX_Developer_Handoff.md`, `.pdf`, `docs/handoff/*.svg`) | **On GitHub** (documentation commits after `8c3be99`) |
 | Chert account, line, API keys | **None exist yet.** Onboarding was started on the Windows laptop but never got past sign-in. |
 | LiveKit project, OpenAI and Gemini keys | **None configured.** |
 
@@ -666,7 +699,35 @@ access, the same as for code.
 | Gemini API key | Provision (Phase 5 only) | Fallback for the brief |
 | Internal agent token | Generate locally | `openssl rand -hex 32` |
 
-Sanitized `.env` additions (append to the existing `.env.example` content; values intentionally empty):
+### 9.1 Reusing or provisioning access securely
+
+- **Tiger Data:** two options.
+  - **Reuse:** the owner sends the `DATABASE_URL` through a password manager's secure share (for
+    example 1Password or Bitwarden), never by chat, email or Git. You paste it into `.env` yourself.
+    Rotate the database password after the hackathon.
+  - **Your own:** create a free Tiger Data service in the Tiger console, copy its connection string
+    into `.env`, then run `uv run python ../scripts/migrate.py` and
+    `uv run python ../scripts/verify_db.py` from `backend/`.
+  - Without either, the app runs fully in memory.
+- **Chert:** provision your **own** account and line (Prompt 1).
+  - The line can only call phones verified for the project, which must be your iPhone.
+  - Nothing was provisioned on the original laptop, and moving a line between accounts is not
+    documented.
+  - Create the project API key at `app.trychert.com/developer` and paste it into `.env` yourself.
+- **LiveKit:** two options.
+  - Create your own free LiveKit Cloud project.
+  - Or have the owner invite you to an existing LiveKit project as a member, and generate your own
+    API key there.
+  - The URL, key and secret must come from the same project. They go only in `agent/.env.local`.
+- **OpenAI and Gemini:** use your own keys, or keys the team lead shares through a password manager.
+  Usage is billed, so agree on a budget.
+- **GitHub:** the owner adds you as a collaborator (repository Settings → Collaborators) so code and
+  Entire checkpoints can be pushed.
+- **Never** paste keys into Claude Code chat. Edit `.env` and `agent/.env.local` in your editor.
+
+### 9.2 Sanitized `.env` additions
+
+Append these to the existing `.env.example` content. Values are intentionally empty.
 
 ```dotenv
 # --- Tiger Data ---
@@ -718,6 +779,7 @@ PUBLIC_BASE_URL=               # only for inbound webhooks via a tunnel
 | F | AI operational brief (OpenAI → Gemini → template) | 6 | Stage A |
 | G | End-to-end tests and three 90-second rehearsals | 7 | Stages D and E |
 | G | Submission and final technical verification | 8 | Stage G rehearsals |
+| H | **Optional, NOT FOR THIS HACKATHON:** future text-based patient navigation (Section 16) | H | After the hackathon, with clinical review |
 
 **Rules for every stage:**
 - Work in order.
@@ -745,6 +807,10 @@ PROJECT CONTEXT
   app/simulation/). frontend/: React 19 + Vite + TypeScript. db/migrations/: Tiger Data schema.
 - Verified demo (I-85, seed 42): proposal 16:15 (tick 17), approval 16:30 (tick 18), shift 17:15
   (tick 21); with 3/3 confirmations 25.50 -> 16.25 ambulance-hours (-9.25, -36.3%).
+
+PREREQUISITES
+- A Mac with the repository cloned (git clone https://github.com/mustafadev123/TriageX.git) and
+  Claude Code running in the repository root. No credentials are required for this stage.
 
 RULES
 - All data is synthetic. Never print, paste or commit secrets (.env, .env.local are gitignored).
@@ -807,6 +873,12 @@ PROJECT CONTEXT
 - The repo already contains a Chert iMessage integration for Chert's *console* API; it is NOT the
   hackathon line API. Do not modify application code in this stage.
 
+PREREQUISITES
+- Prompt 0 accepted (app healthy on this Mac; Entire enabled).
+- My iPhone at hand: FaceTime and iMessage on, signed in with the phone number I will verify.
+- Timing agreed with the team: the free trial runs 24 h (48 h if started by 18 Nov 2026) from activation.
+If any prerequisite is missing, stop and tell me.
+
 RULES
 - Follow the official onboarding at https://app.trychert.com/skills.md (fetch and read it first; if it
   differs from the steps below, follow the official page and tell me what differs).
@@ -846,6 +918,12 @@ STEPS
 8. Draft (do not send) a message I can post in the Chert Discord or give to the help desk asking them
    to enable caller camera capture and outbound FaceTime video for our project ID and line ID.
 
+TESTS (no code changes in this stage, so verification is observational)
+- Quote the onboarding_done JSON record. It should contain no keys; if any field looks like a
+  secret or a phone number, omit that field.
+- whoami exit code 0; the read-only lines request returns HTTP 200 (report status codes only).
+- git status shows .env untracked and unchanged in Git; cd backend && uv run pytest -q still passes.
+
 ACCEPTANCE CRITERIA
 - onboarding_done with demo_outcome "ended" was observed; whoami succeeds; CHERT_API_KEY,
   CHERT_PROJECT_ID, CHERT_LINE_ID are in .env (never printed); docs/chert-status.md is accurate.
@@ -867,6 +945,13 @@ PROJECT CONTEXT
   facetime-remote-audio and, only if caller capture is enabled for our line, facetime-remote-video.
 - The official starter is Node (agent.mjs, @livekit/agents). Our FastAPI backend cannot receive frames
   directly; the agent must.
+
+PREREQUISITES
+- Prompt 1 accepted: docs/chert-status.md shows Chert authentication, line, iPhone verification and
+  the demo call as VERIFIED; CHERT_API_KEY, CHERT_PROJECT_ID, CHERT_LINE_ID are in .env.
+- A free LiveKit Cloud account, and an OpenAI API key with credit (I will enter keys myself).
+- Ideally, Chert has confirmed caller camera capture for our line (if not, this prompt will show it).
+If a prerequisite is missing, stop and tell me.
 
 RULES
 - Follow https://app.trychert.com/skills.md and https://docs.trychert.com/facetime-cli/video.md
@@ -905,6 +990,12 @@ STEPS
    request to Chert from docs/chert-status.md (enable caller camera capture for our line; include
    project ID, line ID, what we observed). Then stop.
 
+TESTS
+- npm run check (if the starter defines it) and npx ... doctor pass.
+- Frame-probe log from the live call shows changing luminance and advancing timestamps for the three
+  camera conditions; a muted camera produces "no current frame", never a stale one.
+- Backend suites unaffected: cd backend && uv run pytest -q; cd frontend && npm test.
+
 ACCEPTANCE CRITERIA
 - Two-way voice works with our own agent via chert dev.
 - Frame dimensions and luminance are logged from real calls and visibly change with the camera.
@@ -929,6 +1020,11 @@ PROJECT CONTEXT
 - Fictional demo staff already exist in backend/app/services/demo_service.py (DEMO_STAFF:
   rn-avery, rn-jordan, rn-morgan, rn-riley, rn-casey, rn-quinn). The card spec is in Section 13 of the
   handoff and docs/handoff/staff-card.svg.
+
+PREREQUISITES
+- Prompt 2 accepted: docs/chert-status.md says "Our agent receives real caller frames: VERIFIED".
+- Printed test cards (Section 13), a vision-capable model ID confirmed in the provider's docs.
+If frames are not VERIFIED, stop immediately and report the blocker.
 
 RULES
 - Synthetic data only; cards say "TriageX DEMO" and "FICTIONAL". No raw frames stored.
@@ -978,6 +1074,11 @@ PROJECT CONTEXT
 - Confirmations must go through DemoService.confirm_live() -> _record_reply() -> Run.recompute(), the
   same path as the simulated button, so the baseline never changes and the effect starts at
   approved_tick + 3 (16:30 approval -> 17:15).
+
+PREREQUISITES
+- Prompt 3 accepted: live card extraction works; backend/app/data/staff_roster.json exists.
+- TRIAGEX_AGENT_TOKEN generated (openssl rand -hex 32) and set in both .env and agent/.env.local.
+If a prerequisite is missing, stop and tell me.
 
 RULES
 - The backend is the authority: it validates the card against backend/app/data/staff_roster.json and
@@ -1037,6 +1138,12 @@ PROJECT CONTEXT
   Authorization: Bearer $CHERT_API_KEY, X-Chert-Project-Id and Idempotency-Key; inbound is by polling
   GET /api/v1/shared-messages (newest 50). Recipients must be verified for the project.
 
+PREREQUISITES
+- Prompt 1 accepted (Chert line, verified iPhone, CHERT_API_KEY / CHERT_PROJECT_ID / CHERT_LINE_ID).
+- Prompt 4's frontend fixes merged (live_message/facetime origins; WebSocket race fix). If they are
+  not, apply those two fixes first, with tests, before any live send.
+If a prerequisite is missing, stop and tell me.
+
 RULES
 - Re-read https://app.trychert.com/skills.md before coding; do not assume undocumented fields. First
   make one read-only GET /api/v1/shared-messages and inspect the real response shape (log field names
@@ -1074,7 +1181,14 @@ PROJECT CONTEXT
 - The dashboard state (GET /api/runs/{run_id}) contains every number. The brief must only restate
   numbers from it.
 
+PREREQUISITES
+- Prompt 0 accepted. OPENAI_API_KEY and GEMINI_API_KEY in .env (entered by me), plus OPENAI_MODEL and
+  GEMINI_MODEL confirmed from official docs. Without keys, build and test with mocked providers and
+  report the live test as PENDING.
+- Lower priority than Prompts 1–5: do this only if the FaceTime flow is on track.
+
 RULES
+- Never print or commit secrets. All data is synthetic; never invent statistics.
 - Verify current model IDs and SDK usage in the official OpenAI and Google Gemini docs; read IDs from
   OPENAI_MODEL / GEMINI_MODEL in .env; never hardcode secrets.
 - Grounding: send the model a facts JSON (metric_key -> value from the API) and require it to cite
@@ -1107,8 +1221,12 @@ You are working on TriageX (repository root, macOS). Read docs/TriageX_Developer
 
 PROJECT CONTEXT: all features from Prompts 0–6 are merged. The live FaceTime call is the centerpiece.
 
+PREREQUISITES: Prompts 0–5 accepted (Prompt 6 optional); docs/chert-status.md shows the FaceTime
+flow VERIFIED; enough Chert trial minutes left for three rehearsals (each call well under 5 minutes);
+printed valid and invalid cards. If not, stop and tell me what is missing.
+
 RULES: no faked results; any fallback used must be named in the report. Keep each call under
-5 minutes; track the trial minutes used.
+5 minutes; track the trial minutes used. Never print or commit secrets or phone numbers.
 
 STEPS
 1. Full automated suites: backend pytest + ruff, frontend test + lint + build, agent tests.
@@ -1132,6 +1250,11 @@ STOP.
 You are working on TriageX (repository root, macOS). Read docs/TriageX_Developer_Handoff.md
 Sections 6.1 and 15, docs/chert-status.md and docs/rehearsal-results.md.
 
+PREREQUISITES: Prompt 7 accepted; docs/rehearsal-results.md shows three consecutive successful runs.
+If not, stop and tell me.
+
+RULES: no new features; never print or commit secrets or phone numbers; report facts only.
+
 OBJECTIVE: final verification and Devpost submission material. No new features.
 
 STEPS
@@ -1150,9 +1273,69 @@ STEPS
 6. Verify the live demo machine: backend, frontend, agent, chert dev all start from a cold boot using
    the README; trial minutes remaining are enough for judging.
 
+TESTS: in the fresh clone run cd backend && uv run pytest -q && uv run ruff check . ;
+cd frontend && npm test && npm run lint && npm run build ; the agent's tests; the security sweep in
+step 2 must find nothing.
+
 ACCEPTANCE: fresh clone passes; no secrets or phone numbers in Git; docs accurate.
 GIT: after approval, commit "docs: final submission and verification"; push; confirm Entire has
 nothing queued. STOP and give me a submission checklist.
+```
+
+### Optional Stage H — Future patient navigation (NOT FOR THIS HACKATHON)
+
+> **Do not run this prompt before or during the hackathon.** It is preserved so the product vision
+> is not lost. Read Section 16 first. Patient-facing FaceTime and visual injury assessment are
+> **out of scope** even for Stage H. They need clinical review and a separate decision.
+
+```text
+NOT FOR THIS HACKATHON. Only run this if the team has explicitly decided, after the hackathon, to
+start patient navigation. If you were not told that explicitly, STOP now and ask me.
+
+You are working on TriageX (repository root, macOS). Read docs/TriageX_Developer_Handoff.md
+Section 16 (Patient Navigation — Original Scope, MVP Cut, and Future Vision) and docs/plan.md
+(lines 25-30, 185-199, 277, 299).
+
+PROJECT CONTEXT
+- TriageX is a synthetic ED surge-response demo. Patient navigation was a secondary, text-based
+  feature in the original brief, deliberately cut from the MVP. Nothing patient-facing exists.
+- The simulation engine (backend/app/simulation/) must not be changed by this stage.
+
+PREREQUISITES
+- Written team decision to start Stage H; Stages A–G complete and the hackathon is over.
+- A named human reviewer for every care-navigation recommendation.
+
+RULES (from the original brief — all mandatory)
+- No medical diagnosis; never decide that someone does not need emergency care.
+- A deterministic safety screen runs BEFORE any AI: clear emergency indicators -> immediate
+  "call 911" guidance; self-harm or suicidal content -> 988 crisis guidance (US). Never wait on an
+  AI before giving emergency guidance. Uncertain or unrecognised input is treated conservatively.
+- Do not present keyword filtering as a complete medical safety system (say so in the UI).
+- Never autonomously redirect anyone away from an emergency department; never claim live
+  urgent-care availability; all congestion data is labelled synthetic.
+- Every care-navigation suggestion requires human confirmation before it is shown as advice.
+- Text only. No FaceTime, no images, no visual injury assessment.
+
+REQUIREMENTS
+1. backend/app/services/safety_screen.py: deterministic, table-driven screen returning
+   {category: emergency|crisis|uncertain|nonemergency, matched_rules, guidance_text}.
+2. POST /api/patient/inquiries (fictional, text): runs the screen first; emergency/crisis responses
+   return immediately without any AI call; nonemergency inquiries go to a pending-review queue.
+3. AIService.classify_nonemergency_message() (docs/plan.md Section F) may draft an explanation for
+   the human reviewer only, using synthetic metrics from the API; numerals validated against facts.
+4. Operator review UI: approve/edit/reject the draft; nothing reaches the "patient" unreviewed.
+5. Persist inquiries, screen results and review decisions (no real personal data).
+
+TESTS
+- Safety-screen unit tests: clear emergency, self-harm, ambiguous symptoms, nonemergency, empty and
+  adversarial input; emergency guidance never calls the AI (assert the provider is not invoked).
+- API tests: no unreviewed advice is returned; nothing recommends avoiding an ED.
+- Existing backend and frontend suites still pass.
+
+ACCEPTANCE: all safety tests pass; a clinician-style review checklist is documented in
+docs/patient-navigation.md; the feature is behind a disabled-by-default flag.
+GIT: after my approval, commit "feat: patient navigation safety screen (post-hackathon)"; push;
+check Entire. STOP.
 ```
 
 ---
@@ -1289,7 +1472,81 @@ and keep the human-readable ID as the primary signal.
 
 ---
 
-## 16. References
+## 16. Patient Navigation — Original Scope, MVP Cut, and Future Vision
+
+> **Status: NOT IMPLEMENTED. NOT FOR THIS HACKATHON.** Nothing patient-facing exists in the codebase.
+> Keep it out of the demo, except as a one-line "what's next" in the pitch.
+
+### 16.1 Original scope (the ERflow brief, Section 8)
+
+The original project brief included **"Patient Navigation and Safety"** as a **secondary feature, not
+the main MVP**, which must not delay the core operational simulation. It was **text-based**: the brief
+speaks of "patient-facing messaging", and the planned AI service included
+`classify_nonemergency_message()` for "constrained, fictional nonemergency inquiries". The brief never
+mentioned FaceTime for patients.
+
+Its mandatory safety rules, carried forward unchanged:
+
+- The system must not provide medical diagnosis, or independently decide that someone does not need
+  emergency care.
+- A **deterministic safety screen runs before any AI model**.
+- Uncertain or unrecognized symptoms are treated conservatively.
+- Keyword filtering must not be presented as a complete medical safety system.
+- Clear emergency indicators trigger emergency-services guidance (call 911). Self-harm or suicidal
+  content triggers **988** crisis guidance (United States).
+- Emergency guidance is never delayed while waiting for an AI response.
+- **Never autonomously redirect patients away from emergency departments.**
+- **Never claim live urgent-care availability** unless it is verified from a suitable source.
+- **Any care-navigation recommendation requires human confirmation.**
+- If reliable safeguards cannot be built in the hackathon time, patient-facing triage is excluded
+  from the MVP.
+
+### 16.2 The MVP cut
+
+The Phase 0 plan cut the feature deliberately:
+- `docs/plan.md` line 30: "Patient navigation is cut from the MVP. At most the deterministic safety
+  screen ships."
+- Patient navigation is first in the cut order (`docs/plan.md` line 277).
+- Open question 5 asks the team to agree to the cut (`docs/plan.md` line 299).
+
+The operational coordination system was the stated priority, and it is what was built.
+
+**Implemented patient-facing functionality: none.** The repository contains no safety screen, no
+988 or 911 guidance logic, and no message classification. "Patients" in the code are synthetic
+arrivals inside the simulation (`backend/app/simulation/arrivals.py`). The closest built feature is
+**level-loading**: an **operator** decision that redirects low-acuity **ambulance** arrivals before
+they arrive, with a travel-time penalty (`docs/plan.md` line 25). It is hospital-side, not
+patient-facing.
+
+### 16.3 Future vision (proposals, not original requirements)
+
+- **Text-based patient navigation (the original idea).**
+  - A person describes a fictional, non-emergency situation by message.
+  - The deterministic safety screen runs first.
+  - Only then may AI help explain care options, using clearly labeled **synthetic** congestion data.
+  - A human confirms any recommendation.
+- **Patient-facing FaceTime with visual assessment (new proposal).**
+  - Proposed after the original plan; never part of the brief.
+  - It carries the highest safety risk: judging injuries from video conflicts with the "no diagnosis"
+    and "never redirect away from emergency departments" rules.
+  - Any future version would need clinical review and must keep every rule in 16.1.
+- **How it could connect to the simulation later.** Walk-in patients changing destination after
+  guidance would need a **new simulation input**. Today's engine models only ambulance level-loading.
+  Under the final scope decisions, the engine is not changed during the hackathon.
+
+### 16.4 Why staff-facing FaceTime is the hackathon priority
+
+- **It reuses the built and tested path.** The confirmation service, recompute and dashboard already
+  exist, and it produces a measured result.
+- **It uses video for verification.** Reading and checking a staff card is a clear, checkable use of
+  live video, which serves the prize's double-weighted video criterion.
+- **It avoids patient-safety risk** in a live healthcare-track demo.
+- **The Chert line limits** make a second live FaceTime workflow risky: one call at a time, 5-minute
+  calls, 50 trial minutes.
+
+---
+
+## 17. References
 
 **Repository documents:**
 - `README.md`: setup and status
