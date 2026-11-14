@@ -1,0 +1,16 @@
+<pasted_content id="a80e">
+Phase 1 is approved.
+
+I have renamed the GitHub repository to TriageX, updated the Git remote, and enabled Entire. Please verify each of those before proceeding.
+
+Now:
+
+1. Run `git status` and verify no credentials, `.env` files, or virtual environments are staged.
+2. Re-run the backend and frontend tests.
+3. Stage and commit the Phase 1 implementation with the message `chore: initialize TriageX monorepo and development environment`.
+4. Verify the commit exists and inspect Entire's checkpoint/session tracking status.
+5. Report whether Entire successfully captured the Claude Code development session. Do not claim it did unless verified.
+6. Report the final Git status and commit hash.
+
+Do not begin Phase 2 yet. Wait for my approval.
+</pasted_content id="a80e">
