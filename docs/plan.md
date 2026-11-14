@@ -102,6 +102,16 @@ TriageX/
 
 ## D. API design
 
+Implemented in Phase 3. The authoritative contract is [api.md](api.md). Changes from
+this plan:
+
+- `POST /api/runs/{id}/brief` and `replay-scripted` are deferred: the brief comes in
+  Phase 5, and replay is handled by the frontend playing back the returned timeline.
+- The staffing-request routes are nested under the run:
+  `/api/runs/{id}/staffing-requests/{rid}/simulate-reply`.
+- Added `GET /api/demo/state` and `GET /api/runs/{id}/diagnostics`.
+- Every `POST` returns the full single-screen `DashboardState`.
+
 | Method and path | Purpose |
 |---|---|
 | `GET /api/health`, `GET /api/integrations/health` | liveness; status of DB, OpenAI, Gemini, Chert |

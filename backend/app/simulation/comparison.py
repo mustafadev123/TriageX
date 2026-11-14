@@ -252,9 +252,28 @@ def run_comparison(
     patients = generate_patients(network, scenario, seed)
     baseline = simulate(network, scenario, patients, (), Track.BASELINE)
     triagex = simulate(network, scenario, patients, interventions, Track.TRIAGEX)
+    return build_comparison(scenario, seed, patients, baseline, triagex, network)
+
+
+def build_comparison(
+    scenario: Scenario,
+    seed: int,
+    patients: tuple[Patient, ...],
+    baseline: TrackResult,
+    triagex: TrackResult,
+    network: Network = DEFAULT_NETWORK,
+    baseline_metrics: tuple[Metrics, Metrics] | None = None,
+) -> Comparison:
+    """Assemble a comparison from already-simulated tracks.
+
+    `baseline_metrics` lets callers reuse the (immutable) baseline's full-horizon and
+    demo-window metrics when only Track B was re-simulated.
+    """
     window = scenario.demo_window
-    bm, tm = summarize(baseline), summarize(triagex)
-    wbm, wtm = summarize(baseline, tick_range=window), summarize(triagex, tick_range=window)
+    if baseline_metrics is None:
+        baseline_metrics = (summarize(baseline), summarize(baseline, tick_range=window))
+    bm, wbm = baseline_metrics
+    tm, wtm = summarize(triagex), summarize(triagex, tick_range=window)
     divergence = first_divergence_tick(baseline, triagex)
     return Comparison(
         scenario=scenario,

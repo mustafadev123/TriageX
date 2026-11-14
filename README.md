@@ -16,10 +16,12 @@ the modeled before-versus-after outcome.
 
 - Phase 1 (repository setup) is complete.
 - Phase 2 (deterministic simulation engine) is complete.
-- The API, database, AI and messaging integrations are not implemented yet.
+- Phase 3 (FastAPI dashboard API and WebSocket) is complete.
+- The database, AI and messaging integrations are not implemented yet.
 
-See [docs/plan.md](docs/plan.md) for the plan and
-[docs/assumptions.md](docs/assumptions.md) for every simulation assumption.
+See [docs/plan.md](docs/plan.md) for the plan,
+[docs/assumptions.md](docs/assumptions.md) for every simulation assumption, and
+[docs/api.md](docs/api.md) for the dashboard API.
 
 ## Try the simulation
 
@@ -69,7 +71,8 @@ cd backend;  uv run uvicorn app.main:app --reload --port 8000
 cd frontend; npm run dev
 ```
 
-The dashboard is at http://localhost:5173 and proxies `/api` to the backend on port 8000.
+The dashboard is at http://localhost:5173 and proxies `/api` and `/ws` to the backend at
+`127.0.0.1:8000`. The API's interactive docs are at http://127.0.0.1:8000/docs.
 
 ## Test
 

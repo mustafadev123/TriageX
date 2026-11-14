@@ -139,3 +139,52 @@ def summarize(
         transfers=sum(r.transfers_out for r in rows),
         mean_staff_utilization_pct=round(_mean([r.staff_utilization_pct for r in rows]), 2),
     )
+
+
+RECOVERY_CALM_TICKS = 4  # one simulated hour below the pressure threshold
+
+
+@dataclass(frozen=True, slots=True)
+class Recovery:
+    """How a hospital came back from a capacity breach."""
+
+    first_breach_tick: int | None  # None: the hospital never breached in the range
+    recovered_tick: int | None  # start of the first calm hour after the first breach
+    breach_ticks: int
+
+
+def ambulance_waiting_hours_by_tick(
+    result: TrackResult, tick_range: tuple[int, int] | None = None
+) -> list[float]:
+    """Cumulative ambulance-hours spent waiting for handoff, network-wide, tick by tick.
+
+    Derived from tick state: every ambulance still waiting for a treatment space at the
+    end of a tick adds one tick (15 minutes). Over a range that covers every waiting
+    ambulance, the final value equals the ledger-based handoff hours.
+    """
+    start, end = tick_range or (0, result.horizon_ticks)
+    total, out = 0, []
+    for t in range(start, end):
+        total += sum(row.ambulance_queue_length for row in result.ticks[t])
+        out.append(round(total * TICK_MINUTES / 60, 2))
+    return out
+
+
+def hospital_recovery(
+    result: TrackResult, hospital_id: str, tick_range: tuple[int, int] | None = None
+) -> Recovery:
+    start, end = tick_range or (0, result.horizon_ticks)
+    series = result.hospital_series(hospital_id)[start:end]
+    first_breach = next((r.tick for r in series if r.status is Status.BREACH), None)
+    breach_ticks = sum(1 for r in series if r.status is Status.BREACH)
+    if first_breach is None:
+        return Recovery(None, None, 0)
+    calm_run, recovered = 0, None
+    for r in series:
+        if r.tick <= first_breach:
+            continue
+        calm_run = calm_run + 1 if r.status is Status.NORMAL else 0
+        if calm_run == RECOVERY_CALM_TICKS:
+            recovered = r.tick - RECOVERY_CALM_TICKS + 1
+            break
+    return Recovery(first_breach, recovered, breach_ticks)

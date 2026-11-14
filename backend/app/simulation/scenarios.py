@@ -72,6 +72,7 @@ class Scenario:
     horizon_ticks: int = DEFAULT_HORIZON_TICKS
     demo_window_ticks: int = DEMO_WINDOW_TICKS
     assumptions: tuple[str, ...] = field(default_factory=tuple)
+    focus_hospital_id: str = "grady"  # hospital the demo narrative centres on
 
     @property
     def demo_window(self) -> tuple[int, int]:
@@ -194,6 +195,7 @@ RESPIRATORY_WAVE = Scenario(
         "Treatment times are 10% longer; more patients arrive on foot.",
         "The warm-up period also runs at elevated demand because the wave is multi-day.",
     ),
+    focus_hospital_id="emory_midtown",
 )
 
 SCENARIOS: dict[str, Scenario] = {

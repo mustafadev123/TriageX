@@ -10,5 +10,5 @@ Start-Process powershell -WorkingDirectory (Join-Path $root "frontend") -Argumen
     "-NoExit", "-Command", "npm run dev"
 )
 
-Write-Host "TriageX backend:  http://localhost:8000/api/health"
+Write-Host "TriageX backend:  http://127.0.0.1:8000/api/health"
 Write-Host "TriageX frontend: http://localhost:5173"
