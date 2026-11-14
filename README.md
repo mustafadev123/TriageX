@@ -85,3 +85,9 @@ cd backend;  uv run pytest;  uv run ruff check .   # DB tests start a local Post
 cd frontend; npm test;       npm run build;  npm run lint
 cd frontend; npm run rehearse -- rehearsal 1366 768   # Edge walkthrough; needs both servers running
 ```
+
+The rehearsal uses Microsoft Edge by default. On macOS (or without Edge), use Google Chrome:
+
+```bash
+cd frontend && REHEARSE_CHANNEL=chrome npm run rehearse -- /tmp/rehearsal 1366 768
+```

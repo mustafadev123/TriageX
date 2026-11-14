@@ -60,8 +60,14 @@ def test_url_parsing_redacts_password():
     assert (s.host, s.port, s.database, s.user, s.sslmode) == (
         "abc.tsdb.cloud.timescale.com", 3417, "tsdb", "tsdbadmin", "require")  # fmt: skip
     assert "s3cret" not in s.redacted
+    assert s.unix_socket is None
     with pytest.raises(ValueError):
         parse_database_url("mysql://x@y/z")
+    # libpq Unix-socket form, as returned by pgserver on macOS/Linux
+    u = parse_database_url("postgresql://postgres:@/postgres?host=/tmp/pgdir")
+    assert (u.unix_socket, u.port, u.sslmode) == ("/tmp/pgdir/.s.PGSQL.5432", 5432, "disable")
+    with pytest.raises(ValueError):
+        parse_database_url("postgresql:///postgres")
 
 
 def test_ping_reports_a_real_round_trip(database):

@@ -1,16 +1,19 @@
-// Rehearses the 90-second demo against the running app (real backend), in Microsoft Edge:
+// Rehearses the 90-second demo against the running app (real backend), in Microsoft Edge by
+// default (set REHEARSE_CHANNEL=chrome to use Google Chrome, e.g. on macOS):
 // walks every presenter step, takes screenshots, checks the layout fits without scrolling,
 // and measures confirmation latency.
 //
 //   (backend on 127.0.0.1:8000 and `npm run dev` running)
 //   npm run rehearse -- <outDir> [width] [height]      e.g. npm run rehearse -- ../docs/screenshots 1366 768
+//   REHEARSE_CHANNEL=chrome npm run rehearse -- /tmp/rehearsal 1366 768   (macOS, Google Chrome)
 import { chromium } from 'playwright-core'
 
 const [outDir = 'rehearsal', w = '1366', h = '768'] = process.argv.slice(2)
 await import('node:fs').then((fs) => fs.mkdirSync(outDir, { recursive: true }))
 const width = Number(w)
 const height = Number(h)
-const URL = 'http://127.0.0.1:5173/'
+// localhost, not 127.0.0.1: on macOS the Vite dev server listens on IPv6 (::1) only.
+const URL = process.env.REHEARSE_URL || 'http://localhost:5173/'
 const log = []
 const t0 = Date.now()
 const note = (msg) => {
@@ -19,7 +22,8 @@ const note = (msg) => {
   console.log(line)
 }
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true })
+const channel = process.env.REHEARSE_CHANNEL || 'msedge'
+const browser = await chromium.launch({ channel, headless: true })
 const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 })
 const consoleErrors = []
 page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()))

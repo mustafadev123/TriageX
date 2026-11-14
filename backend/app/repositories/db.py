@@ -36,6 +36,8 @@ class ConnectionSettings:
     password: str | None
     sslmode: str
     schema: str | None
+    # Unix-domain socket path (libpq `?host=/dir` form, e.g. pgserver on macOS/Linux).
+    unix_socket: str | None = None
 
     @property
     def redacted(self) -> str:
@@ -46,19 +48,29 @@ def parse_database_url(url: str, schema: str | None = None) -> ConnectionSetting
     parsed = urlparse(url)
     if parsed.scheme not in ("postgres", "postgresql"):
         raise ValueError("DATABASE_URL must start with postgres:// or postgresql://")
-    if not parsed.hostname:
-        raise ValueError("DATABASE_URL has no host")
     query = parse_qs(parsed.query)
+    socket_dir = query.get("host", [""])[0]
+    if not socket_dir.startswith("/"):
+        socket_dir = ""
+    if not parsed.hostname and not socket_dir:
+        raise ValueError("DATABASE_URL has no host")
+    port = parsed.port or int(query.get("port", ["5432"])[0])
+    host = parsed.hostname or socket_dir
+    if socket_dir:
+        default_sslmode = "disable"  # libpq never uses SSL over a Unix socket
+    elif host in ("127.0.0.1", "localhost"):
+        default_sslmode = "prefer"
+    else:
+        default_sslmode = "require"
     return ConnectionSettings(
-        host=parsed.hostname,
-        port=parsed.port or 5432,
+        host=host,
+        port=port,
         database=unquote(parsed.path.lstrip("/")) or "postgres",
         user=unquote(parsed.username or "postgres"),
         password=unquote(parsed.password) if parsed.password else None,
-        sslmode=query.get(
-            "sslmode", ["prefer" if parsed.hostname in ("127.0.0.1", "localhost") else "require"]
-        )[0],  # fmt: skip
+        sslmode=query.get("sslmode", [default_sslmode])[0],
         schema=schema,
+        unix_socket=f"{socket_dir}/.s.PGSQL.{port}" if socket_dir else None,
     )
 
 
@@ -108,11 +120,12 @@ class Database:
             password=s.password,
             host=s.host,
             port=s.port,
+            unix_sock=s.unix_socket,
             database=s.database,
             ssl_context=_ssl_context(s.sslmode),
             timeout=timeout or self.timeout_seconds,
             application_name=self.application_name,
-            tcp_keepalive=True,
+            tcp_keepalive=s.unix_socket is None,
         )
         if s.schema:
             con.run(f"CREATE SCHEMA IF NOT EXISTS {pg8000.native.identifier(s.schema)}")

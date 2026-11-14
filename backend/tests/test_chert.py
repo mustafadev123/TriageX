@@ -25,7 +25,7 @@ from app.integrations.chert import (
 )
 from app.main import create_app
 from app.services.demo_service import DemoService
-from app.services.outreach import ChertConfig, ChertClient, OutreachService, outreach_message
+from app.services.outreach import ChertClient, ChertConfig, OutreachService, outreach_message
 
 SECRET = "whsec_test_only"
 SIGNING = "sk_test_only"
@@ -62,8 +62,10 @@ class FakeChert:
             body = json.loads(request.content)
             self.sent.append(body)
             if self.fail_sends:
-                return httpx.Response(400, json={"status": "failed", "code": 1003,
-                                                 "retryable": False, "reason": "invalid phone"})  # fmt: skip
+                return httpx.Response(400, json={
+                    "status": "failed", "code": 1003,
+                    "retryable": False, "reason": "invalid phone",
+                })  # fmt: skip
             return httpx.Response(200, json={
                 "status": "sent", "message_id": uuid.uuid4().hex,
                 "lead_id": f"chat-{body['phone'][-4:]}", "lead_created": True,
