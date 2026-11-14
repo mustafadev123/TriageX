@@ -14,9 +14,20 @@ the modeled before-versus-after outcome.
 
 ## Status
 
-Phase 1 (repository setup) is complete: both apps run and their test suites are wired. The
-simulation, database, AI and messaging integrations are not implemented yet. See
-[docs/plan.md](docs/plan.md) for the full plan and phase order.
+- Phase 1 (repository setup) is complete.
+- Phase 2 (deterministic simulation engine) is complete.
+- The API, database, AI and messaging integrations are not implemented yet.
+
+See [docs/plan.md](docs/plan.md) for the plan and
+[docs/assumptions.md](docs/assumptions.md) for every simulation assumption.
+
+## Try the simulation
+
+```powershell
+cd backend
+uv run python -m app.simulation.cli i85_pileup --seed 42
+uv run python -m app.simulation.cli heat_wave --seed 7 --staff 0 --no-level-loading
+```
 
 ## Layout
 

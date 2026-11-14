@@ -62,6 +62,7 @@ TriageX/
 │  │  ├─ main.py  config.py  logging_config.py
 │  │  ├─ simulation/   engine.py scenarios.py hospitals.py forecast.py
 │  │  │                interventions.py metrics.py models.py
+│  │  │                arrivals.py comparison.py cli.py
 │  │  ├─ api/          health.py runs.py coordination.py webhooks.py ai.py ws.py
 │  │  ├─ services/     run_service.py coordination_service.py safety_screen.py
 │  │  ├─ integrations/ ai_base.py openai_provider.py gemini_provider.py
@@ -118,6 +119,17 @@ WebSocket `/ws` sends `feed.event`, `run.updated`, `integration.status`, `brief.
 event carries `origin: live | synthetic`.
 
 ## E. Simulation specification
+
+Implemented in Phase 2. The authoritative, detailed version is
+[assumptions.md](assumptions.md). Differences from this plan, made during Phase 2:
+
+- Three extra modules: `arrivals.py` (all randomness), `comparison.py` (two-track runs
+  and deltas) and `cli.py` (command-line report).
+- Separate surge spaces are not modeled. Capacity is `min(spaces, staff × 3.5)`.
+- An 8-hour warm-up gives hospitals a realistic starting occupancy, identical in both
+  tracks.
+- When the source hospital is already diverting, active level-loading chooses a
+  forecast-aware receiver, and the patient still counts as a diversion.
 
 - **Time:** 15-minute ticks over a 24-hour horizon (96 ticks).
 - **State per hospital:** treatment spaces, surge spaces, staff on duty, patients in treatment
