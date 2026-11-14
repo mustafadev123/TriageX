@@ -8,6 +8,7 @@ import { greetOnBridgeReady } from './greet.mjs';
 import { startFrameProbe } from './frame-probe.mjs';
 import { startCardReader } from './card-session.mjs';
 import { HINT_SPEECH, spokenCardId } from './card-reader.mjs';
+import { callIdFor, createBackend, isConfirmation } from './backend.mjs';
 
 // Change these instructions to build your own agent. Keep replies conversational.
 const instructions = `You are the TriageX DEMO staffing agent on a FaceTime video call, part of a
@@ -20,10 +21,15 @@ Staff cards: a separate card scanner reads the caller's fictional TriageX DEMO s
 camera. You cannot see the video yourself. Only the scanner's messages tell you what a card says:
 never guess, invent or repeat a card ID or name that the scanner did not report.
 If the caller wants to show a card again or show another card, call scan_staff_card.
-Never say a card is valid, verified or accepted, and never say you recorded a confirmation: checking a
-card against the roster is not connected yet.`;
+Only the TriageX system decides whether a card is on the roster and whether a confirmation is
+recorded; it tells you through system messages. Never say a card is valid or that someone is
+confirmed unless a system message says so. When the caller says "I confirm", reply only
+"One moment" and wait for the system message.`;
 // Said once, as soon as FaceTime is ready. Keep it short: it is the first thing the caller hears.
-const greeting = 'Greet the caller in one short sentence: say you are the TriageX DEMO staffing agent, an AI, and ask them to hold their staff card up to the camera.';
+const greetingFor = request => request
+  ? `Greet the caller in two short sentences: say you are the TriageX DEMO staffing agent, an AI; TriageX needs ${request.requested - request.confirmed} more staff at ${request.hospital} for a simulated surge shift starting ${request.shift_starts}; ask them to hold their staff card up to the camera.`
+  : 'Greet the caller in one short sentence: say you are the TriageX DEMO staffing agent, an AI, and ask them to hold their staff card up to the camera.';
+const CONFIRM_WINDOW_MS = 110_000; // the backend accepts a confirmation up to 2 minutes after the card check
 // Gemini Live via the Gemini API (GOOGLE_API_KEY). Override with GEMINI_LIVE_MODEL in .env.local.
 const liveModel = process.env.GEMINI_LIVE_MODEL || 'gemini-2.5-flash-native-audio-preview-12-2025';
 // Development aid (CARD_AUTO_RESCAN=1): after a card is read or a scan times out, start a new scan
@@ -43,32 +49,88 @@ const agent = defineAgent({
     /** @type {string | null} */
     let lastCardId = null;
     let rescanTimer = null;
+    // Backend (Prompt 4): roster check and confirmation. Without TRIAGEX_AGENT_TOKEN the agent
+    // only reads cards and says that nothing can be checked.
+    const backend = createBackend();
+    const card = (event, data) => console.log(`[card] ${JSON.stringify({ card: event, at: new Date().toISOString(), ...data })}`);
+    let callId = callIdFor(ctx.room);
+    /** @type {any} */ let request = null;
+    /** A valid card waiting for the caller's "I confirm". */
+    /** @type {{ cardId: string, name: string, until: number } | null} */ let pendingConfirm = null;
     const say = text => {
       try { session?.generateReply({ instructions: text }); } catch { /* the call ended */ }
     };
+    const rescan = (ms, ignoreCardId) => {
+      clearTimeout(rescanTimer);
+      rescanTimer = setTimeout(() => reader.scan({ ignoreCardId }), ms);
+    };
+
+    async function checkCard(r) {
+      const spoken = spokenCardId(r.card_id);
+      if (!backend.enabled) {
+        say(`The card scanner read the caller's card: ID ${spoken}${r.name ? `, name ${r.name}` : ''}. Tell them this, reading the ID character by character, and say the TriageX roster check is not connected, so nothing can be confirmed.`);
+        return;
+      }
+      let res;
+      try {
+        res = await backend.cardCheck(callId, r);
+      } catch (e) {
+        card('backend_error', { step: 'card_check', error: e.code ?? String(e) });
+        say(`Tell the caller in one short sentence that you read card ${spoken} but could not reach the TriageX system to check it, so nothing can be confirmed right now.`);
+        return;
+      }
+      card('backend_check', { card_id: res.card_id, valid: res.valid, reason: res.reason });
+      if (res.valid) {
+        pendingConfirm = { cardId: res.card_id, name: res.display_name, until: Date.now() + CONFIRM_WINDOW_MS };
+        const shift = request ? ` at ${request.hospital}, starting ${request.shift_starts}` : '';
+        say(`System message: the TriageX roster check passed. ${res.message} Tell the caller, reading the ID character by character (${spoken}), that their card is on the TriageX DEMO roster, then ask them to say "I confirm" to accept the simulated surge shift${shift}. They are not confirmed yet.`);
+      } else {
+        pendingConfirm = null;
+        say(`System message: the TriageX roster check rejected the card. ${res.message} Tell the caller this in one or two short sentences, reading the ID character by character (${spoken}), say it cannot be used to confirm, and ask them to show a different card if they have one.`);
+        rescan(7000, res.card_id); // ready for a different card; the rejected one is ignored
+      }
+    }
+
+    async function confirmShift() {
+      const p = pendingConfirm;
+      pendingConfirm = null;
+      if (!p) return;
+      card('confirm_phrase_heard', { card_id: p.cardId }); // the phrase, not the transcript
+      let res;
+      try {
+        res = await backend.confirm(callId, p.cardId);
+      } catch (e) {
+        card('backend_error', { step: 'confirm', error: e.code ?? String(e) });
+        say('Tell the caller in one short sentence that the TriageX system could not be reached, so the confirmation was not recorded.');
+        return;
+      }
+      card('backend_confirm', { card_id: p.cardId, confirmed: res.confirmed, duplicate: res.duplicate, reason: res.reason, count: res.confirmed_count, requested: res.requested });
+      if (res.confirmed) {
+        say(`System message: the TriageX system recorded the confirmation. ${res.message} Thank the caller in one or two short sentences, say ${p.name ?? 'they'} ${res.duplicate ? 'was already' : 'is now'} confirmed for the simulated surge shift starting ${res.shift_starts}, and that they can hang up.`);
+      } else {
+        say(`System message: the TriageX system did not record a confirmation. ${res.message} Tell the caller this in one short sentence.`);
+      }
+    }
+
     const reader = startCardReader(ctx.room, {
       onEvent: event => {
         if (event.type === 'nudge') {
           say(HINT_SPEECH[event.hint]);
         } else if (event.type === 'accepted') {
-          const r = event.reading;
-          lastCardId = r.card_id;
-          say(`The card scanner read the caller's card. Tell them, in two short sentences, what it says: ` +
-            `ID ${spokenCardId(r.card_id)}` +
-            (r.name ? `, name ${r.name}` : '') +
-            (r.availability ? `, availability ${r.availability}` : '') +
-            `. Read the ID character by character. Then say the card still has to be checked against the TriageX roster, ` +
-            `which is not connected in this build, so nothing is verified yet.`);
+          lastCardId = event.reading.card_id;
+          void checkCard(event.reading);
+          if (autoRescan) rescan(12000, lastCardId);
         } else if (event.type === 'timed_out') {
           say('Tell the caller in one short sentence that you could not read the staff card, and ask whether they would like to try again.');
-        }
-        if (autoRescan && event.type !== 'nudge') {
-          clearTimeout(rescanTimer);
-          rescanTimer = setTimeout(() => reader.scan({ ignoreCardId: lastCardId }), 6000);
+          if (autoRescan) rescan(6000, lastCardId);
         }
       },
     });
-    ctx.addShutdownCallback(async () => { clearTimeout(rescanTimer); reader.stop(); });
+    ctx.addShutdownCallback(async () => {
+      clearTimeout(rescanTimer);
+      reader.stop();
+      if (backend.enabled) await backend.callEvent(callId, 'ended').catch(() => {});
+    });
 
     const scanTool = llm.tool({
       description: 'Start reading a fictional TriageX DEMO staff card from the caller\'s camera. Use it when the caller wants to show a card again or show a different card. The result is reported to you later by the scanner.',
@@ -97,6 +159,10 @@ const agent = defineAgent({
     // find us, but wait before opening a paid model session or sending video.
     const caller = await ctx.waitForParticipant();
     reader.syncTracks();
+    // Look up the open staffing request now, so the greeting can name it without delay.
+    const requestLookup = backend.enabled
+      ? backend.activeRequest().then(r => { request = r; }).catch(e => card('backend_error', { step: 'active_request', error: e.code ?? String(e) }))
+      : Promise.resolve();
 
     // Video: one camera track, published by this agent. The Mac shows video only
     // from the participant that speaks, so the picture and the voice stay together.
@@ -112,6 +178,13 @@ const agent = defineAgent({
       llm: new realtime.RealtimeModel({ model: liveModel, voice: 'Puck' }),
     });
     session.on(voice.AgentSessionEventTypes.AgentStateChanged, event => { speaking = event.newState === 'speaking'; });
+    // "I confirm" is checked on the caller's own words (Gemini Live input transcription), not left
+    // to the voice model: only a clear, unnegated phrase after a valid card check confirms.
+    session.on(voice.AgentSessionEventTypes.UserInputTranscribed, event => {
+      if (!event.isFinal || !pendingConfirm) return;
+      if (Date.now() > pendingConfirm.until) { pendingConfirm = null; return; }
+      if (isConfirmation(event.transcript)) void confirmShift();
+    });
     ctx.addShutdownCallback(async () => {
       clearInterval(timer);
       await session.close();
@@ -139,8 +212,15 @@ const agent = defineAgent({
     // The card scan ("awaiting card") starts with the greeting; the first voice
     // nudge comes no earlier than 9 s later, so it does not cut the greeting off.
     const stopGreeting = greetOnBridgeReady(ctx.room, () => {
-      session.generateReply({ instructions: greeting });
-      reader.scan();
+      callId = callIdFor(ctx.room); // chert dev puts the call id in the metadata at bridge_ready
+      // Greet within the 10 s limit: wait at most 1.5 s for the request lookup.
+      void Promise.race([requestLookup, new Promise(r => setTimeout(r, 1500))]).then(() => {
+        session.generateReply({ instructions: greetingFor(request) });
+        reader.scan();
+      });
+      if (backend.enabled) {
+        backend.callEvent(callId, 'connected').catch(e => card('backend_error', { step: 'call', error: e.code ?? String(e) }));
+      }
     });
     ctx.addShutdownCallback(async () => stopGreeting());
   },

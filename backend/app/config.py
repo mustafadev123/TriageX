@@ -28,11 +28,14 @@ class Settings(BaseSettings):
     database_pool_size: int = 3
     database_timeout_seconds: float = 10.0
 
-    # AI providers (Phase 5)
-    openai_api_key: str | None = None
+    # AI providers (Phase 5 / Prompt 6). TriageX uses the Gemini API free tier only (no paid
+    # provider). GEMINI_API_KEY, or GOOGLE_API_KEY (the agent's key name), both work.
+    openai_api_key: str | None = None  # unused; kept so an old .env still loads
     openai_model: str | None = None
     gemini_api_key: str | None = None
-    gemini_model: str | None = None
+    google_api_key: str | None = None
+    gemini_model: str | None = None  # default gemini-3.1-flash-lite
+    gemini_fallback_model: str | None = None  # default gemini-3.5-flash-lite
     ai_primary_provider: str = "openai"
     ai_fallback_provider: str = "gemini"
 
@@ -43,6 +46,16 @@ class Settings(BaseSettings):
     demo_allowed_phones: str = ""
     public_base_url: str | None = None
     chert_api_base: str | None = None  # defaults to https://console.trychert.com/api/v1
+    # Chert hackathon line (Shared/trial plan): project API key from app.trychert.com/developer
+    # (starts ftk_), the project id, and the line id (GET /api/v1/lines). Preferred over the
+    # console API above when all three are set.
+    chert_api_key: str | None = None
+    chert_project_id: str | None = None
+    chert_line_id: str | None = None
+    chert_shared_api_base: str | None = None  # defaults to https://app.trychert.com/api/v1
+
+    # FaceTime agent -> backend (Prompt 4). Shared secret in .env and agent/.env.local.
+    triagex_agent_token: str | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:

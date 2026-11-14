@@ -1,4 +1,4 @@
-import type { DashboardState, IntegrationsResponse, ScenarioInfo } from '../types/dashboard'
+import type { DashboardState, IntegrationsResponse, OperationalBrief, ScenarioInfo } from '../types/dashboard'
 
 export interface HealthResponse {
   status: string
@@ -64,4 +64,9 @@ export const api = {
   diagnostics: (runId: string) =>
     request<Record<string, unknown>>(`/api/runs/${encodeURIComponent(runId)}/diagnostics`),
   provenance: () => request<Record<string, unknown>>('/api/meta/provenance'),
+  brief: (runId: string, atTick: number) =>
+    request<OperationalBrief>(`/api/runs/${encodeURIComponent(runId)}/brief`, {
+      method: 'POST',
+      body: JSON.stringify({ at_tick: atTick }),
+    }),
 }

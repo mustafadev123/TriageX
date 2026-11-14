@@ -68,8 +68,11 @@ def start_outreach(app: FastAPI, run: Run, request_id: str) -> int:
 
 
 async def _deliver(app: FastAPI, run_id: str, records: list[OutreachRecord]) -> None:
+    outreach = _outreach(app)
     try:
-        await run_in_threadpool(_outreach(app).deliver, records)
+        if outreach.shared:  # baseline first, so no earlier message can confirm this request
+            await run_in_threadpool(outreach.prime_shared)
+        await run_in_threadpool(outreach.deliver, records)
     except Exception:
         log.exception("outreach delivery crashed")
         for r in records:
@@ -82,6 +85,42 @@ async def _deliver(app: FastAPI, run_id: str, records: list[OutreachRecord]) -> 
     except NotFoundError:  # the demo was reset meanwhile
         return
     await publish_run(app, run, "outreach_sent")
+    if outreach.shared:
+        ensure_shared_polling(app)
+
+
+SHARED_POLL_S = 2.0
+
+
+def ensure_shared_polling(app: FastAPI) -> None:
+    """Poll GET /shared-messages every 2 s while a shared-line message awaits a reply; the
+    loop stops by itself when none does. At most one loop runs."""
+    current = getattr(app.state, "shared_poller", None)
+    if current is not None and not current.done():
+        return
+    task = asyncio.get_running_loop().create_task(_poll_shared(app))
+    app.state.shared_poller = task
+    tasks: set = app.state.background_tasks
+    tasks.add(task)
+    task.add_done_callback(tasks.discard)
+
+
+async def _poll_shared(app: FastAPI) -> None:
+    outreach = _outreach(app)
+    try:
+        while await run_in_threadpool(outreach.awaiting_shared):
+            outcomes = await run_in_threadpool(outreach.poll_shared)
+            for o in outcomes:
+                _submit(app, WebhookRow.of(o))
+                if o.record is not None:
+                    _submit(app, OutreachRow.of(o.record))
+                if o.run is not None:
+                    await publish_run(app, o.run, "staff_confirmed_live")
+            await asyncio.sleep(SHARED_POLL_S)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        log.exception("shared-messages polling crashed")
 
 
 @router.post("/webhooks/chert")

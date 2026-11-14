@@ -27,6 +27,7 @@ import re
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import httpx
 
@@ -112,6 +113,7 @@ class InboundEvent:
     sender: str | None  # phone (E.164) or Apple ID email, as Chert reports it
     is_me: bool
     text: str
+    created_at: datetime | None = None  # when Chert says the message was created (polling)
 
 
 def parse_event(payload: Mapping) -> InboundEvent:

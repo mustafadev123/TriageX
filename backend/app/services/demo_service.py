@@ -34,6 +34,10 @@ from app.simulation.scenarios import Scenario, get_scenario
 
 log = logging.getLogger("triagex.demo")
 
+# Sources whose confirmations come from a real person through a live channel. They carry the
+# recipient's identity, so the same person can never confirm one request twice.
+LIVE_SOURCES = frozenset({"webhook", "imessage", "facetime"})
+
 DEFAULT_SCENARIO_ID = "i85_pileup"
 DEFAULT_SEED = 42
 DEFAULT_REQUEST_TTL = timedelta(minutes=10)
@@ -62,7 +66,8 @@ class ConflictError(RuntimeError):
 class ConfirmationRecord:
     staff_id: str
     display_name: str
-    source: str  # "simulated" (dashboard fallback) or "webhook" (verified Chert reply)
+    source: str  # "simulated" (dashboard fallback), "webhook" / "imessage" (verified Chert
+    # reply) or "facetime" (live FaceTime card check plus verbal confirmation)
     received_at: datetime
     recompute_ms: float
 
@@ -182,6 +187,8 @@ class DemoService:
         self._active_run_id: str | None = None
         # Set by OutreachService; lets the dashboard show live-messaging state per request.
         self.messaging = None
+        # Set by FaceTimeService; lets the dashboard show live FaceTime calls and card checks.
+        self.facetime = None
 
     # --- runs -----------------------------------------------------------------------
     def create_run(self, scenario_id: str = DEFAULT_SCENARIO_ID, seed: int = DEFAULT_SEED) -> Run:
@@ -294,11 +301,20 @@ class DemoService:
         return self._record_reply(run_id, request_id, staff_id, reply, source="simulated")
 
     def confirm_live(
-        self, run_id: str, request_id: str, staff_id: str, display_name: str, reply: str
+        self,
+        run_id: str,
+        request_id: str,
+        staff_id: str,
+        display_name: str,
+        reply: str,
+        source: str = "webhook",
     ) -> tuple[Run, ConfirmationRecord]:
-        """A verified Chert webhook reply. Same validation and recompute as the fallback."""
+        """A verified live confirmation (Chert iMessage reply or FaceTime card check plus
+        verbal confirmation). Same validation and recompute as the fallback."""
+        if source not in LIVE_SOURCES:
+            raise ValueError(f"'{source}' is not a live confirmation source")
         return self._record_reply(
-            run_id, request_id, staff_id, reply, source="webhook", display_name=display_name
+            run_id, request_id, staff_id, reply, source=source, display_name=display_name
         )
 
     def touch(self, run_id: str) -> Run:
@@ -331,7 +347,7 @@ class DemoService:
             if request.confirmed_staff >= request.requested_staff:
                 raise ConflictError(f"Staffing request '{request_id}' is already fully confirmed")
             confirmed_ids = {c.staff_id for c in request.confirmations}
-            if source == "webhook":
+            if source in LIVE_SOURCES:
                 if not staff_id or not display_name:
                     raise ConflictError("A live confirmation needs a recipient identity")
                 if staff_id in confirmed_ids:
@@ -345,7 +361,7 @@ class DemoService:
             elif staff_id in confirmed_ids:
                 raise ConflictError(f"'{staff_id}' has already confirmed this request")
 
-            name = display_name if source == "webhook" else STAFF_NAMES[staff_id]
+            name = display_name if source in LIVE_SOURCES else STAFF_NAMES[staff_id]
             record = ConfirmationRecord(staff_id, name, source, now, 0.0)
             request.confirmations.append(record)
             record.recompute_ms = run.recompute()

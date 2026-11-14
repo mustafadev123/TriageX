@@ -14,7 +14,8 @@ from pydantic import BaseModel, Field
 
 TrackName = Literal["baseline", "triagex"]
 StatusName = Literal["normal", "pressure", "breach"]
-Origin = Literal["simulation", "operator", "simulated_reply", "webhook", "live_message"]
+Origin = Literal["simulation", "operator", "simulated_reply", "webhook", "live_message", "facetime"]
+ConfirmationSource = Literal["simulated", "webhook", "imessage", "facetime"]
 Severity = Literal["info", "warning", "critical", "success"]
 CurvePhase = Literal["before_intervention", "staff_en_route", "shift_active", "after_shift"]
 
@@ -176,8 +177,44 @@ class ProposalCard(BaseModel):
 class Confirmation(BaseModel):
     staff_id: str
     display_name: str
-    source: Literal["simulated", "webhook"]
+    source: ConfirmationSource
     received_at: datetime
+
+
+class CardCheckView(BaseModel):
+    """Fields the agent read from a fictional staff card, and the backend's roster decision.
+    Text only: no image is ever stored or sent to the dashboard."""
+
+    check_id: str
+    card_id: str
+    read_name: str | None
+    read_role: str | None
+    read_availability: str | None
+    confidence: float
+    valid: bool
+    reason: str
+    message: str
+    staff_id: str | None
+    display_name: str | None
+    checked_at: datetime
+
+
+class FaceTimeCallView(BaseModel):
+    call_id: str  # Chert's call id, shortened
+    status: Literal["connected", "ended"]
+    connected_at: datetime
+    ended_at: datetime | None = None
+    checks: list[CardCheckView] = []
+    confirmed_staff: int = 0
+
+
+class FaceTimeView(BaseModel):
+    """Live FaceTime verification. `enabled` means the agent token is configured; calls are
+    listed only after the agent actually reported them."""
+
+    enabled: bool = False
+    detail: str = "FaceTime agent not connected"
+    calls: list[FaceTimeCallView] = []
 
 
 class OutreachView(BaseModel):
@@ -285,6 +322,7 @@ class DashboardState(BaseModel):
     impact: Impact
     divergence: Divergence | None
     messaging: MessagingView = MessagingView()
+    facetime: FaceTimeView = FaceTimeView()
     meta: Meta
 
 

@@ -59,7 +59,7 @@ The payload is about 245 KB uncompressed and about 12 KB with gzip.
 | Method and path | Purpose |
 |---|---|
 | `GET /api/health` | Liveness, branding, synthetic-data notice |
-| `GET /api/integrations/health` | Simulation `ok`. The database reports `not_configured`, `starting`, `ok` or `error`. AI and Chert report `not_implemented` until their phases. |
+| `GET /api/integrations/health` | Simulation `ok`. Database, AI brief (`ai_primary`, `ai_fallback`), Chert iMessage (`messaging`) and the FaceTime agent (`facetime`) report `not_configured`, `starting`, `ok` or `error`; `ok` only after a real successful check or use. |
 | `GET /api/hospitals` | Map pins (synthetic capacity) |
 | `GET /api/scenarios` | Scenario selector |
 | `POST /api/demo/reset` | Body (optional): `{scenario_id, seed}`. Discards all runs and returns a new, identical initial state |
@@ -71,6 +71,12 @@ The payload is about 245 KB uncompressed and about 12 KB with gzip.
 | `GET /api/runs/{run_id}/diagnostics` | Assumptions, limitations, forecast accuracy, all proposals, digests, recompute timings |
 | `GET /api/db/status`, `GET /api/runs/{run_id}/db/insights` | Tiger Data status and stored-row queries (see [database.md](database.md)) |
 | `GET /api/meta/provenance` | Running git commit and the Entire checkpoint refs in the repository |
+| `POST /api/runs/{run_id}/brief` | Body: `{at_tick}`. Grounded operational brief from the state visible at `at_tick` (Gemini primary → Gemini fallback → template). Numbers are filled in by the server |
+| `GET /api/runs/{run_id}/brief` | The latest brief for the run, or 404 |
+| `GET /api/agent/active-request` | FaceTime agent only (header `X-TriageX-Agent-Token`). The open staffing request, or 404 |
+| `POST /api/agent/call` | Agent: `{call_id, event: connected \| ended}` |
+| `POST /api/agent/card-check` | Agent: `{call_id, card_id, name, role, availability, confidence}` → `{valid, reason, message, staff_id, display_name}`. Roster: `backend/app/data/staff_roster.json` |
+| `POST /api/agent/confirm` | Agent: `{call_id, card_id, verbal_confirmation: "I confirm"}`. Needs a valid card check on the same call within 2 minutes; records one `facetime` confirmation through the same path as the simulated reply; idempotent (409 with a reason otherwise) |
 
 Error codes:
 

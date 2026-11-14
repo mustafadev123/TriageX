@@ -13,7 +13,9 @@ const ORIGIN: Record<FeedEvent['origin'], { label: string; cls: string }> = {
   simulation: { label: 'Model', cls: 'text-faint' },
   operator: { label: 'Operator', cls: 'text-shared' },
   simulated_reply: { label: 'Simulated reply', cls: 'text-st-approaching' },
-  webhook: { label: 'Live reply', cls: 'text-triagex-strong' },
+  webhook: { label: 'Live iMessage', cls: 'text-triagex-strong' },
+  live_message: { label: 'iMessage', cls: 'text-shared' },
+  facetime: { label: 'Live FaceTime', cls: 'text-triagex-strong' },
 }
 
 export const CoordinationFeed = memo(function CoordinationFeed({ state, playhead }: { state: DashboardState; playhead: number }) {
@@ -40,7 +42,7 @@ export const CoordinationFeed = memo(function CoordinationFeed({ state, playhead
             </div>
             <div className="text-[12.5px] leading-snug text-muted">{e.detail}</div>
             <div className="mt-0.5 flex gap-2 text-[10px] font-semibold tracking-wider uppercase">
-              <span className={ORIGIN[e.origin].cls}>{ORIGIN[e.origin].label}</span>
+              <span className={(ORIGIN[e.origin] ?? ORIGIN.simulation).cls}>{(ORIGIN[e.origin] ?? ORIGIN.simulation).label}</span>
               {e.track === 'baseline' && <span className="text-baseline">Without TriageX</span>}
               {e.track === 'both' && e.kind.startsWith('diversion') && <span className="text-faint">Both futures</span>}
             </div>

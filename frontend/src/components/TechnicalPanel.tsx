@@ -78,8 +78,9 @@ export function TechnicalPanel({ state, onClose }: { state: DashboardState; onCl
         <Section title="Integrations (live from /api/integrations/health)">
           {data.integrations ? (
             <ul className="space-y-1.5">
-              {(['simulation', 'database', 'ai_primary', 'ai_fallback', 'messaging'] as const).map((k) => {
+              {(['simulation', 'database', 'ai_primary', 'ai_fallback', 'messaging', 'facetime'] as const).map((k) => {
                 const h = data.integrations![k]
+                if (!h) return null
                 return (
                   <li key={k} className="flex gap-3">
                     <span className="w-28 shrink-0 font-semibold">{h.name}</span>

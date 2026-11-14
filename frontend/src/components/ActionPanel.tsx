@@ -1,6 +1,44 @@
+import { useEffect, useState } from 'react'
 import { activeRequest, pointAt, recommendedProposal } from '../lib/demo'
 import type { Attention, Busy } from '../hooks/useDemo'
-import type { DashboardState } from '../types/dashboard'
+import type { ConfirmationSource, DashboardState, FaceTimeCallView } from '../types/dashboard'
+import { fallbackNotice } from '../lib/fallback'
+
+const SOURCE_LABEL: Record<ConfirmationSource, string> = {
+  facetime: 'Live FaceTime',
+  webhook: 'Live iMessage',
+  imessage: 'Live iMessage',
+  simulated: 'Simulated',
+}
+
+/** The live FaceTime call: what the agent read from the card and the roster decision. */
+function FaceTimeStatus({ call }: { call: FaceTimeCallView }) {
+  const check = call.checks.at(-1)
+  const verdict = check
+    ? check.valid
+      ? `On roster ✓ ${check.display_name ?? ''}`
+      : `Rejected · ${check.message.replace(/^Card \S+ /, '')}`
+    : 'Reading staff card from live video…'
+  return (
+    <div className="mt-2 rounded-lg border border-line bg-ink/40 px-2.5 py-1.5 text-[12px]" data-testid="facetime-status">
+      <div className="flex items-center gap-1.5">
+        <span className={`inline-block h-2 w-2 rounded-full ${call.status === 'connected' ? 'bg-st-normal' : 'bg-faint'}`} />
+        <span className="font-semibold">FaceTime {call.status === 'connected' ? 'live' : 'ended'}</span>
+        {check && (
+          <span className="tabular ml-auto text-muted">
+            <span className="font-bold text-[13px] text-text">{check.card_id}</span> · {check.confidence.toFixed(2)}
+          </span>
+        )}
+      </div>
+      <div
+        className={`truncate ${check ? (check.valid ? 'font-semibold text-triagex-strong' : 'font-semibold text-st-approaching') : 'text-muted'}`}
+        title={check?.message}
+      >
+        {verdict}
+      </div>
+    </div>
+  )
+}
 
 interface Props {
   state: DashboardState
@@ -20,6 +58,13 @@ interface Props {
 export function ActionPanel({ state, playhead, busy, attention, lastReplyMs, onApprove, onSimulateReply }: Props) {
   const card = recommendedProposal(state)
   const req = activeRequest(state)
+  const waiting = req !== undefined && req.confirmed_staff < req.requested_staff && req.status !== 'expired'
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    if (!waiting) return
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [waiting])
   const hospital = state.hospitals.find((h) => h.id === (req?.hospital_id ?? card?.hospital_id))
 
   if (!card || playhead < card.tick) {
@@ -59,6 +104,8 @@ export function ActionPanel({ state, playhead, busy, attention, lastReplyMs, onA
     )
   }
 
+  const liveCall = state.facetime?.calls[0]
+  const notice = fallbackNotice(state, req, nowMs)
   const shiftActive = req.confirmed_staff > 0 && playhead >= req.effective_tick
   const full = req.confirmed_staff >= req.requested_staff
   const expired = req.status === 'expired'
@@ -103,7 +150,7 @@ export function ActionPanel({ state, playhead, busy, attention, lastReplyMs, onA
                 <>
                   <div className="truncate font-semibold">{c.display_name.replace(/ \(fictional RN\)$/, '')}</div>
                   <div className="text-[10px] uppercase tracking-wider text-muted">
-                    {c.source === 'webhook' ? 'Live reply' : 'Simulated'}
+                    {SOURCE_LABEL[c.source] ?? c.source}
                   </div>
                 </>
               ) : (
@@ -113,6 +160,29 @@ export function ActionPanel({ state, playhead, busy, attention, lastReplyMs, onA
           )
         })}
       </ol>
+
+      {liveCall ? (
+        <FaceTimeStatus call={liveCall} />
+      ) : (
+        waiting &&
+        state.facetime?.enabled && (
+          <p className="mt-3 text-[12px] text-muted" data-testid="facetime-waiting">
+            <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-st-approaching" />
+            Waiting for a FaceTime call to the TriageX line…
+          </p>
+        )
+      )}
+      {(req.outreach ?? []).length > 0 && (
+        <p className="mt-2 text-[12px] text-muted" data-testid="imessage-status">
+          iMessage:{' '}
+          {(req.outreach ?? []).map((o) => `${o.recipient} ${o.status}`).join(' · ')}
+        </p>
+      )}
+      {notice && (
+        <p className="mt-2 rounded-lg bg-st-approaching/10 px-2 py-1.5 text-[12px] text-st-approaching" data-testid="fallback-notice">
+          {notice}
+        </p>
+      )}
 
       {req.confirmed_staff > 0 && capacityNow !== undefined && capacityOnShift !== undefined && (
         <p className="mt-2 text-[13px]">

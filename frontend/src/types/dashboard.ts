@@ -2,7 +2,8 @@
 
 export type TrackName = 'baseline' | 'triagex'
 export type StatusName = 'normal' | 'pressure' | 'breach'
-export type Origin = 'simulation' | 'operator' | 'simulated_reply' | 'webhook'
+export type Origin = 'simulation' | 'operator' | 'simulated_reply' | 'webhook' | 'live_message' | 'facetime'
+export type ConfirmationSource = 'simulated' | 'webhook' | 'imessage' | 'facetime'
 export type Severity = 'info' | 'warning' | 'critical' | 'success'
 export type CurvePhase = 'before_intervention' | 'staff_en_route' | 'shift_active' | 'after_shift'
 
@@ -142,8 +143,59 @@ export interface ProposalCard {
 export interface Confirmation {
   staff_id: string
   display_name: string
-  source: 'simulated' | 'webhook'
+  source: ConfirmationSource
   received_at: string
+}
+
+/** One live iMessage to an opted-in recipient (the number is never exposed). */
+export interface OutreachView {
+  outreach_id: string
+  recipient: string
+  status: 'sending' | 'sent' | 'failed' | 'confirmed'
+  sent_at: string | null
+  confirmed_at: string | null
+  error: string | null
+  send_ms: number | null
+}
+
+export interface MessagingView {
+  live: boolean
+  status: 'ok' | 'starting' | 'not_configured' | 'error'
+  detail: string
+  recipients: number
+  last_webhook_outcome: string | null
+  last_webhook_ms: number | null
+}
+
+/** Fields read from a fictional staff card on live video, and the backend's roster decision. */
+export interface CardCheckView {
+  check_id: string
+  card_id: string
+  read_name: string | null
+  read_role: string | null
+  read_availability: string | null
+  confidence: number
+  valid: boolean
+  reason: string
+  message: string
+  staff_id: string | null
+  display_name: string | null
+  checked_at: string
+}
+
+export interface FaceTimeCallView {
+  call_id: string
+  status: 'connected' | 'ended'
+  connected_at: string
+  ended_at: string | null
+  checks: CardCheckView[]
+  confirmed_staff: number
+}
+
+export interface FaceTimeView {
+  enabled: boolean
+  detail: string
+  calls: FaceTimeCallView[]
 }
 
 export interface StaffingRequest {
@@ -164,6 +216,7 @@ export interface StaffingRequest {
   approved_at: string
   expires_at: string
   confirmations: Confirmation[]
+  outreach?: OutreachView[]
 }
 
 export interface HeroMetric {
@@ -214,6 +267,8 @@ export interface DashboardState {
   staffing_requests: StaffingRequest[]
   impact: Impact
   divergence: { tick: number; clock: string } | null
+  messaging?: MessagingView
+  facetime?: FaceTimeView
   meta: { generated_at: string; recompute_ms: number | null; build_ms: number }
 }
 
@@ -240,5 +295,27 @@ export interface IntegrationsResponse {
   ai_primary: IntegrationHealth
   ai_fallback: IntegrationHealth
   messaging: IntegrationHealth
+  facetime?: IntegrationHealth
   websocket_clients: number
+}
+
+/** A grounded operational brief: numbers are filled in by the backend, never by the model. */
+export interface OperationalBrief {
+  brief_id: string
+  run_id: string
+  version: number
+  at_tick: number
+  clock: string
+  provider: 'gemini' | 'gemini_fallback' | 'template'
+  model: string | null
+  latency_ms: number
+  fallback_reason: string | null
+  headline: string
+  bullets: string[]
+  action: string
+  metric_keys: string[]
+  facts: Record<string, string>
+  generated_at: string
+  notice: string
+  attempts: string[]
 }

@@ -14,7 +14,7 @@ No secrets and no phone numbers are recorded here. Times are US Eastern (UTC−5
 | Line provisioned | **VERIFIED** | `chert doctor`: line "Silas Thorne" available, routing configured, calls enabled, worker Mac checked in |
 | iPhone verified (iMessage code) | **VERIFIED** | Completed by the developer in Chert's onboarding; the line accepted two FaceTime Video calls from that iPhone (below) |
 | Hosted demo call (`demo_outcome`) | **SKIPPED** | Not run: it proves nothing about our agent and costs trial minutes. The local onboarding record is an expired pre-sign-in session; setup was already complete when checked |
-| Trial | **ACTIVE** | `chert doctor`: 42 of 50 FaceTime minutes left after three test calls; "trial line stays yours until your trial ends" |
+| Trial | **ACTIVE** | `chert doctor`: about 41 of 50 FaceTime minutes left after four test calls (not re-checked after call 4); "trial line stays yours until your trial ends" |
 | LiveKit Cloud (own project) | **VERIFIED** | `chert doctor`: "LiveKit accepted the credentials"; `doctor --agent`: agent joined a test room in 1.2 s. Chert-managed LiveKit: `livekit_not_provisioned` |
 | Voice model | **VERIFIED** | Gemini Live `gemini-2.5-flash-native-audio-preview-12-2025`, Gemini API free tier, via `@livekit/agents-plugin-google` 1.8.0 (replaces the starter's paid OpenAI realtime model) |
 | Two-way voice with our agent | **VERIFIED** (logs) | Call 1, below. Subjective audio quality not yet reported by the caller |
@@ -22,8 +22,10 @@ No secrets and no phone numbers are recorded here. Times are US Eastern (UTC−5
 | Our agent receives real caller frames | **VERIFIED** | Call 2: 609 frames, luminance follows the camera |
 | Vision model for cards | **VERIFIED** | `gemini-3.5-flash-lite` (`VISION_MODEL`), Gemini API free tier, same key. Listed by `GET /v1beta/models` for the key; Google's model page: stable, image input, structured output. Free-tier limit measured: **15 requests/min per model** |
 | Staff-card recognition from live FaceTime video | **VERIFIED** | Call 3: 5 different cards read with the exact `card_id` (1001, 1002, 1003, 9999, 1004); blank screen gave `card_present=false`; 45 s timeout fired |
-| Card validation against the roster | **PENDING** | Prompt 4 (the backend decides; the agent only extracts) |
-| Outbound FaceTime (agent places the call) | **UNKNOWN** | Not tested; needs a project API key and `POST /api/v1/calls` (handoff Section 6.4, Phase D2) |
+| Card validation + "I confirm" → dashboard (Prompt 4) | **BUILT, live call PENDING** | Backend, agent and dashboard tested (pytest, agent and vitest suites); over real HTTP the agent client got 9999 rejected, 1004 off duty, 1001 valid → confirmed once (repeat = duplicate); the dashboard updated 48–68 ms after the confirm call. Token set in both files. Call 4 (14:05–14:06 ET, about 1 min, made before outreach was approved): the agent's authenticated calls reached the backend (`POST /api/agent/call` 200 ×3; `GET /api/agent/active-request` correctly 404 with no open request); 11 samples, no card shown, 45 s timeout. The card → "I confirm" path is still to be tested on a call |
+| Shared-line iMessage (Prompt 5) | **BUILT, live PENDING** | Adapter tested with mocked HTTP. Keys are in `.env`; the backend health check reported `ok` (a real authenticated `GET /shared-messages` succeeded). Responses come wrapped as `{data: {items, total, limit, offset}, request_id}` (seen live, now parsed); per-message field names are still unknown because the line had no messages. The response shape of `/shared-messages` is undocumented: run `scripts/chert_inspect.py` first. Trial lines may only reply within 24 h of a phone's last text |
+| AI operational brief (Prompt 6) | **VERIFIED** (real Gemini API, local run) | Real Gemini briefs: primary `gemini-3.1-flash-lite` (≈1 s), forced primary failure → fallback `gemini-3.5-flash-lite` with the reason shown; a real primary timeout also fell back visibly. Needs `GEMINI_API_KEY` in `.env` for the dashboard |
+| Outbound FaceTime (agent places the call) | **SKIPPED** | Out of scope by decision on 2026-11-14 |
 | Project API key / `CHERT_LINE_ID` in `.env` | **PENDING** | Not needed for inbound calls via `chert dev`; needed for outbound calls and the shared-line iMessage adapter (Prompt 5) |
 
 ## Call 1: two-way voice (11:08:59–11:10:21, about 80 s)
@@ -105,5 +107,7 @@ Problems found, fixed after the call (unit-tested, `npm test` 38/38, **not yet r
 
 ## Next
 
-Prompt 4: send the accepted card fields to FastAPI, which checks `card_id` against
-`backend/app/data/staff_roster.json` (1001–1003 accepted, 9999 unknown, 1004 off duty).
+1. Add the keys listed in the README/handoff to `.env` and `agent/.env.local` (never in chat).
+2. One live call (about 3 min): approve outreach, call, show 9999 (rejected aloud), then 1001,
+   say "I confirm"; the dashboard shows 1/3 **Live FaceTime**. Record the result here.
+3. With the Chert key: `scripts/chert_inspect.py`, then one real iMessage round trip.

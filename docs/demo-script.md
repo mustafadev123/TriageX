@@ -31,6 +31,36 @@ The presenter only moves the playhead and clicks the two explicit actions.
 - **Step back one tick:** ←.
 - **Technical view for judges:** D.
 
+## Live FaceTime version (macOS, Prompts 4–6)
+
+Four terminals (Node 24; never stop `chert dev` with anything but Ctrl+C):
+
+```sh
+cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000      # 1. backend
+cd frontend && npm run dev                                                   # 2. dashboard
+cd agent && npm start                                                        # 3. agent
+cd agent && npx --yes @trychert/facetime@0.1.0-beta.21 dev --agent triagex-facetime-agent --minutes 30   # 4. line
+```
+
+Needs `TRIAGEX_AGENT_TOKEN` (same value in `.env` and `agent/.env.local`) and, for the AI brief,
+`GEMINI_API_KEY` in `.env`. The 16:30 steps change as follows:
+
+1. **Approve outreach** at 16:30. The panel says "Waiting for a FaceTime call…".
+2. The teammate FaceTime-videos the line. The agent names the request (Grady, staff needed,
+   shift 17:15) and asks for the staff card.
+3. Show **TX-RN-9999**: the agent reads it back and says it is not on the TriageX DEMO roster.
+   The feed shows **Card Rejected**; the counter does not move.
+4. Show **TX-RN-1001**: "on the roster"; the agent asks for "I confirm". Say it. The counter
+   becomes 1/3 labeled **Live FaceTime**, with **Staff Confirmed via FaceTime** in the feed.
+5. Then (and only then) click **Simulate staff reply "IN"** twice for the other two staff, and say
+   they are simulated. Doing the simulated replies first would use Avery's fictional identity, and
+   her card would then be refused as already confirmed.
+6. Continue: **Activate Shift**, **Reveal Impact**. Optional: **Generate** the AI brief (bottom of
+   the right column); its badge says Gemini, Gemini fallback, or Template.
+
+If no FaceTime call arrives within 60 s of approval, or the call ends without a confirmation,
+the panel says so and offers the iMessage reply (when configured) or the simulated fallback.
+
 ## The walkthrough
 
 | Time | Presenter does | Screen shows | Say |

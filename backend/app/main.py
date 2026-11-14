@@ -8,8 +8,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from app.api.brief import router as brief_router
 from app.api.chert import router as chert_router
 from app.api.db import router as db_router
+from app.api.facetime import router as facetime_router
 from app.api.health import router as health_router
 from app.api.meta import router as meta_router
 from app.api.reference import router as reference_router
@@ -20,7 +22,9 @@ from app.config import APP_NAME, get_settings
 from app.logging_config import configure_logging
 from app.repositories.db import Database
 from app.repositories.persistence import PersistenceWriter
+from app.services.brief import BriefService, brief_service_from_settings
 from app.services.demo_service import DemoService
+from app.services.facetime import FaceTimeService
 from app.services.outreach import ChertConfig, OutreachService
 
 log = logging.getLogger("triagex")
@@ -44,6 +48,7 @@ def create_app(
     demo_service: DemoService | None = None,
     persistence: PersistenceWriter | None = None,
     outreach: OutreachService | None = None,
+    briefs: BriefService | None = None,
 ) -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -69,6 +74,8 @@ def create_app(
     app = FastAPI(title=f"{APP_NAME} API", version="0.4.0", lifespan=lifespan)
     app.state.demo_service = demo
     app.state.outreach = outreach
+    app.state.facetime = FaceTimeService(demo, enabled=bool(settings.triagex_agent_token))
+    app.state.briefs = briefs if briefs is not None else brief_service_from_settings(settings)
     app.state.background_tasks = set()
     app.state.persistence = writer
     app.state.ws_manager = ConnectionManager()
@@ -85,6 +92,8 @@ def create_app(
     app.include_router(db_router, prefix="/api")
     app.include_router(meta_router, prefix="/api")
     app.include_router(chert_router, prefix="/api")
+    app.include_router(facetime_router, prefix="/api")
+    app.include_router(brief_router, prefix="/api")
     app.include_router(ws_router)
     return app
 

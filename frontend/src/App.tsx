@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ActionPanel } from './components/ActionPanel'
+import { BriefPanel } from './components/BriefPanel'
 import { CoordinationFeed } from './components/CoordinationFeed'
 import { FuturesCharts } from './components/FuturesCharts'
 import { HospitalDetail, HospitalMap } from './components/HospitalMap'
@@ -122,7 +123,7 @@ export default function App() {
           <FuturesCharts state={state} playhead={demo.playhead} />
         </div>
 
-        <div className="flex min-h-0 flex-col">
+        <div className="flex min-h-0 flex-col overflow-hidden">
           <ActionPanel
             state={state}
             playhead={demo.playhead}
@@ -137,6 +138,7 @@ export default function App() {
               {demo.hint}
             </p>
           )}
+          <BriefPanel state={state} playhead={demo.playhead} />
           <CoordinationFeed state={state} playhead={demo.playhead} />
         </div>
       </main>

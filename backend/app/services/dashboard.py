@@ -10,12 +10,15 @@ from datetime import UTC, datetime
 from app.config import SYNTHETIC_DATA_NOTICE
 from app.models.dashboard import (
     Band,
+    CardCheckView,
     Confirmation,
     CurvePoint,
     Curves,
     DashboardState,
     Diagnostics,
     Divergence,
+    FaceTimeCallView,
+    FaceTimeView,
     FeedEvent,
     Flow,
     ForecastAccuracy,
@@ -422,27 +425,47 @@ def _feed(service: DemoService, run: Run, divergence: int | None) -> list[FeedEv
                         f"({', '.join(o.masked for o in sent)})"),
                 kind="outreach_sent", track="triagex", origin="live_message", severity="info",
                 hospital_id=r.hospital_id, wall_time=min(o.sent_at for o in sent))  # fmt: skip
+        # Live events in the order they happened: FaceTime calls, card checks, confirmations.
+        live: list[tuple[datetime, int, list[dict]]] = []
+        ft = service.facetime
+        if ft is not None:
+            checks = ft.checks_for_request(r.request_id)
+            checked_calls = {k.call_id for k in checks}
+            for call in ft.calls_for_run(run.run_id):
+                if call.call_id in checked_calls or call.connected_at >= r.approved_at:
+                    live.append((call.connected_at, 0, [dict(
+                        title="FaceTime Connected",
+                        detail="Live FaceTime video call with the TriageX DEMO staffing agent",
+                        kind="facetime_connected", origin="facetime", severity="info",
+                        wall_time=call.connected_at)]))  # fmt: skip
+            for k in checks:
+                live.append((k.checked_at, 1, [dict(
+                    title="Card Verified" if k.valid else "Card Rejected",
+                    detail=f"{k.message} Read from live video (confidence {k.confidence:.2f}).",
+                    kind="card_verified" if k.valid else "card_rejected", origin="facetime",
+                    severity="success" if k.valid else "warning", wall_time=k.checked_at)]))
         for i, conf in enumerate(r.confirmations, start=1):
-            add(
-                3,
-                tick=r.approved_tick,
-                title="Staff Confirmed",
-                detail=(
-                    f"{conf.display_name} confirmed for {name} ({i}/{r.requested_staff})"
-                    + (" via simulated reply" if conf.source != "webhook"
-                       else " via live iMessage reply")  # fmt: skip
-                ),
-                kind="staff_confirmed",
-                track="triagex",
-                origin="webhook" if conf.source == "webhook" else "simulated_reply",
-                severity="success",
-                hospital_id=r.hospital_id,
-                wall_time=conf.received_at,
-            )
-            add(3, tick=r.approved_tick, title="Capacity Recalculated",
-                detail=f"With TriageX future recalculated in {conf.recompute_ms:.0f} ms",
-                kind="recalculated", track="triagex", origin="simulation", severity="info",
-                hospital_id=r.hospital_id, wall_time=conf.received_at)  # fmt: skip
+            title, via, origin = {
+                "facetime": ("Staff Confirmed via FaceTime", " via live FaceTime (card + voice)",
+                             "facetime"),
+                "webhook": ("Staff Confirmed", " via live iMessage reply", "webhook"),
+                "imessage": ("Staff Confirmed", " via live iMessage reply", "webhook"),
+            }.get(conf.source, ("Staff Confirmed", " via simulated reply", "simulated_reply"))
+            live.append((conf.received_at, 2, [
+                dict(title=title,
+                     detail=(f"{conf.display_name} confirmed for {name} "
+                             f"({i}/{r.requested_staff}){via}"),
+                     kind="staff_confirmed", origin=origin, severity="success",
+                     wall_time=conf.received_at),
+                dict(title="Capacity Recalculated",
+                     detail=f"With TriageX future recalculated in {conf.recompute_ms:.0f} ms",
+                     kind="recalculated", origin="simulation", severity="info",
+                     wall_time=conf.received_at),
+            ]))  # fmt: skip
+        live.sort(key=lambda x: (x[0], x[1]))
+        for _, _, group in live:
+            for kw in group:
+                add(3, tick=r.approved_tick, track="triagex", hospital_id=r.hospital_id, **kw)
         if r.confirmed_staff:
             iv = r.intervention()
             add(3, tick=r.approved_tick, title="Staff En Route",
@@ -587,6 +610,36 @@ def _outreach(service: DemoService, request_id: str) -> list[OutreachView]:
     ]
 
 
+def _facetime(service: DemoService, run: Run) -> FaceTimeView:
+    ft = service.facetime
+    if ft is None:
+        return FaceTimeView()
+    calls = sorted(ft.calls_for_run(run.run_id), key=lambda c: c.connected_at, reverse=True)
+    if not ft.enabled:
+        detail = "Agent token not configured (TRIAGEX_AGENT_TOKEN)"
+    elif not calls:
+        detail = "Agent ready; no FaceTime call reported yet"
+    else:
+        detail = f"{len(calls)} FaceTime call{'s' if len(calls) != 1 else ''} this run"
+    return FaceTimeView(
+        enabled=ft.enabled,
+        detail=detail,
+        calls=[
+            FaceTimeCallView(
+                call_id=c.call_id[:8], status=c.status, connected_at=c.connected_at,
+                ended_at=c.ended_at, confirmed_staff=len(c.confirmed_staff_ids),
+                checks=[CardCheckView(
+                    check_id=k.check_id, card_id=k.card_id, read_name=k.read_name,
+                    read_role=k.read_role, read_availability=k.read_availability,
+                    confidence=k.confidence, valid=k.valid, reason=k.reason, message=k.message,
+                    staff_id=k.staff_id, display_name=k.display_name, checked_at=k.checked_at,
+                ) for k in c.checks[-5:]],
+            )  # fmt: skip
+            for c in calls[:3]
+        ],
+    )
+
+
 def build_dashboard(service: DemoService, run: Run) -> DashboardState:
     started = time.perf_counter()
     sc, c = run.scenario, run.comparison
@@ -647,6 +700,7 @@ def build_dashboard(service: DemoService, run: Run) -> DashboardState:
         if divergence is not None
         else None,
         messaging=_messaging(service),
+        facetime=_facetime(service, run),
         meta=Meta(generated_at=datetime.now(UTC), recompute_ms=run.last_recompute_ms, build_ms=0),
     )
     state.meta.build_ms = round((time.perf_counter() - started) * 1000, 2)

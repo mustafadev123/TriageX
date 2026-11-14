@@ -66,6 +66,10 @@ export function useDemo(): DemoController {
   // While our own request is in flight, its response carries the new state; the
   // WebSocket echo of the same change must not trigger a second (redundant) fetch.
   const mutating = useRef(0)
+  // A different change (e.g. a live FaceTime or iMessage confirmation) can land while our
+  // request is in flight. Remember the newest version announced meanwhile, and fetch it
+  // after the request if our response did not already include it.
+  const pendingUpdate = useRef<{ runId: string; version: number } | null>(null)
 
   const adopt = useCallback((next: DashboardState, resetPlayhead = false) => {
     const current = stateRef.current
@@ -83,6 +87,18 @@ export function useDemo(): DemoController {
   const fail = useCallback((e: unknown) => {
     setError(e instanceof Error ? e.message : 'Unexpected error')
   }, [])
+
+  const endMutation = useCallback(() => {
+    mutating.current -= 1
+    if (mutating.current > 0) return
+    const pending = pendingUpdate.current
+    pendingUpdate.current = null
+    const current = stateRef.current
+    if (!pending || !current || pending.runId !== current.run.run_id) return
+    if (pending.version > current.run.version) {
+      api.run(current.run.run_id).then((s) => adopt(s)).catch(fail)
+    }
+  }, [adopt, fail])
 
   // Initial load: the active run (the presenter resets explicitly).
   useEffect(() => {
@@ -121,7 +137,14 @@ export function useDemo(): DemoController {
         } catch {
           return
         }
-        if (msg.type !== 'run.updated' || mutating.current > 0) return
+        if (msg.type !== 'run.updated') return
+        if (mutating.current > 0) {
+          const p = pendingUpdate.current
+          if (msg.run_id && typeof msg.version === 'number' && (!p || p.runId !== msg.run_id || msg.version > p.version)) {
+            pendingUpdate.current = { runId: msg.run_id, version: msg.version }
+          }
+          return
+        }
         const current = stateRef.current
         if (!current) return
         if (msg.run_id !== current.run.run_id) {
@@ -173,7 +196,7 @@ export function useDemo(): DemoController {
       try {
         adopt(await api.reset(id ?? scenarioId, DEFAULT_SEED), true)
       } finally {
-        mutating.current -= 1
+        endMutation()
       }
       setLastReplyMs(null)
     } catch (e) {
@@ -181,7 +204,7 @@ export function useDemo(): DemoController {
     } finally {
       setBusy(null)
     }
-  }, [adopt, fail, scenarioId])
+  }, [adopt, endMutation, fail, scenarioId])
 
   const approve = useCallback(async () => {
     const s = stateRef.current
@@ -199,14 +222,14 @@ export function useDemo(): DemoController {
       try {
         adopt(await api.approve(s.run.run_id, card.id, playhead))
       } finally {
-        mutating.current -= 1
+        endMutation()
       }
     } catch (e) {
       fail(e)
     } finally {
       setBusy(null)
     }
-  }, [adopt, fail, flash, playhead])
+  }, [adopt, endMutation, fail, flash, playhead])
 
   const simulateReply = useCallback(async () => {
     const s = stateRef.current
@@ -219,7 +242,7 @@ export function useDemo(): DemoController {
       try {
         adopt(await api.simulateReply(s.run.run_id, req.request_id))
       } finally {
-        mutating.current -= 1
+        endMutation()
       }
       setLastReplyMs(Math.round(performance.now() - started))
     } catch (e) {
@@ -227,7 +250,7 @@ export function useDemo(): DemoController {
     } finally {
       setBusy(null)
     }
-  }, [adopt, fail])
+  }, [adopt, endMutation, fail])
 
   const nextEvent = useCallback(() => {
     const s = stateRef.current

@@ -20,7 +20,13 @@ TriageX. All data is synthetic. Differences from the starter:
   Gemini Live (`pushVideo` is a no-op), so the voice model never sees the camera.
 - **Frame probe:** `frame-probe.mjs` (Stage C evidence) now runs only with `FRAME_PROBE=1`.
 - **Tests:** `npm test` (Node's built-in runner; recorded model outputs in `test/fixtures/`, no images).
-- **Not yet:** backend roster check and confirmation (handoff Prompt 4).
+- **Roster check and confirmation** (`backend.mjs`, Prompt 4): after a stable reading the agent
+  sends the fields to the TriageX backend (`BACKEND_URL`, header `X-TriageX-Agent-Token` =
+  `TRIAGEX_AGENT_TOKEN`), which decides validity against the synthetic roster. The agent says the
+  result; for a valid card it asks the caller to say "I confirm". That phrase is checked on the
+  caller's own words (Gemini Live input transcription, `isConfirmation`), never left to the voice
+  model; only then does the backend record one confirmation. A rejected card re-arms the scanner
+  for a different card. Without the token the agent only reads cards.
 
 Run (Node 24): `npm start` in one terminal; in a second terminal, from this folder,
 `npx --yes @trychert/facetime@0.1.0-beta.21 dev --agent triagex-facetime-agent --minutes 30`.

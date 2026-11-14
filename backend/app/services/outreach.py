@@ -20,7 +20,7 @@ import uuid
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from app.config import DEMO_MESSAGE_PREFIX, Settings
 from app.integrations.chert import (
@@ -36,12 +36,15 @@ from app.integrations.chert import (
     phone_hash,
     verify_webhook_signature,
 )
+from app.integrations.chert_shared import DEFAULT_SHARED_API_BASE, SharedLineClient, SharedMessage
 from app.services.demo_service import ConflictError, DemoService, NotFoundError, Run
 
 log = logging.getLogger("triagex.outreach")
 
 CONFIRM_REPLY = "in"
 SEEN_EVENTS_MAX = 5000
+# A polled reply must not predate our message (Chert's clock vs ours: small tolerance).
+REPLY_CLOCK_TOLERANCE = timedelta(seconds=5)
 
 
 @dataclass(slots=True, frozen=True)
@@ -53,6 +56,16 @@ class ChertConfig:
     rejected_phone_entries: int = 0
     public_base_url: str | None = None
     api_base: str = DEFAULT_API_BASE
+    # Hackathon Shared/trial line (app.trychert.com project API).
+    api_key: str | None = None
+    project_id: str | None = None
+    line_id: str | None = None
+    shared_api_base: str = DEFAULT_SHARED_API_BASE
+
+    @property
+    def shared(self) -> bool:
+        """True when the Shared-line project API is configured (preferred transport)."""
+        return bool(self.api_key and self.project_id and self.line_id)
 
     @classmethod
     def from_settings(cls, s: Settings) -> ChertConfig:
@@ -66,17 +79,29 @@ class ChertConfig:
             rejected_phone_entries=len(entries) - len(phones),
             public_base_url=(s.public_base_url or "").rstrip("/") or None,
             api_base=s.chert_api_base or DEFAULT_API_BASE,
+            api_key=s.chert_api_key or None,
+            project_id=s.chert_project_id or None,
+            line_id=s.chert_line_id or None,
+            shared_api_base=s.chert_shared_api_base or DEFAULT_SHARED_API_BASE,
         )
 
     @property
     def can_send(self) -> bool:
-        return bool(self.signing_secret and self.allowed_phones)
+        return bool((self.shared or self.signing_secret) and self.allowed_phones)
 
     @property
     def webhook_url(self) -> str | None:
         return f"{self.public_base_url}{WEBHOOK_PATH}" if self.public_base_url else None
 
     def missing(self) -> list[str]:
+        if self.shared or self.api_key or self.project_id or self.line_id:
+            shared = {
+                "CHERT_API_KEY": self.api_key,
+                "CHERT_PROJECT_ID": self.project_id,
+                "CHERT_LINE_ID": self.line_id,
+                "DEMO_ALLOWED_PHONES": self.allowed_phones,
+            }
+            return [k for k, v in shared.items() if not v]
         out = []
         if not self.signing_secret:
             out.append("CHERT_SIGNING_SECRET")
@@ -99,6 +124,7 @@ class OutreachRecord:
     body: str
     created_at: datetime
     status: str = "sending"  # sending | sent | failed | confirmed
+    channel: str = "console"  # console (signed webhooks) | shared (polled project API)
     message_id: str | None = None
     lead_id: str | None = None
     sent_at: datetime | None = None
@@ -136,6 +162,7 @@ class WebhookOutcome:
     signature_valid: bool = False
     received_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     processing_ms: float = 0.0
+    channel: str = "console_webhook"  # console_webhook | shared_poll (no signature involved)
 
 
 WEBHOOK_OUTCOMES = (
@@ -172,9 +199,17 @@ class OutreachService:
     ):
         self.demo = demo
         self.config = config
-        if client is None and config.signing_secret:
+        if client is None and config.shared:
+            assert config.api_key and config.project_id and config.line_id
+            client = SharedLineClient(config.api_key, config.project_id, config.line_id,
+                                      config.shared_api_base)  # fmt: skip
+        elif client is None and config.signing_secret:
             client = ChertClient(config.signing_secret, config.tenant, config.api_base)
         self.client = client
+        self.shared = bool(getattr(client, "shared", False))
+        self.last_poll_at: datetime | None = None
+        self.last_poll_fields: list[str] = []
+        self.poll_unparsed = 0
         self.clock = clock
         self._lock = threading.RLock()
         self._records: dict[str, OutreachRecord] = {}
@@ -224,6 +259,8 @@ class OutreachService:
         """(status, detail) for /api/integrations/health. 'ok' only after Chert itself
         accepted the credentials and every inbound prerequisite is present."""
         c = self.config
+        if self.shared or c.api_key or c.project_id or c.line_id:
+            return self._shared_health()
         if not c.signing_secret:
             return "not_configured", "Missing: " + ", ".join(c.missing())
         if self.check_result is None:
@@ -251,6 +288,26 @@ class OutreachService:
             return "error", "; ".join(parts + ["missing: " + ", ".join(problems)])
         return "ok", "; ".join(parts)
 
+    def _shared_health(self) -> tuple[str, str]:
+        c = self.config
+        missing = c.missing()
+        if not self.shared:
+            return "not_configured", "Missing: " + ", ".join(missing)
+        if self.check_result is None:
+            return "starting", "Checking the API key with GET /shared-messages…"
+        r = self.check_result
+        if not r.ok:
+            return "error", r.detail
+        parts = [f"Shared line: {r.detail}", f"{len(c.allowed_phones)} opted-in recipient(s)",
+                 "inbound replies by polling every 2 s"]  # fmt: skip
+        if self.last_live_confirmation_at:
+            parts.append(f"last live reply {self.last_live_confirmation_at:%H:%M:%S} UTC")
+        else:
+            parts.append("no live reply verified yet")
+        if missing:
+            return "error", "; ".join(parts + ["missing: " + ", ".join(missing)])
+        return "ok", "; ".join(parts)
+
     # --- outbound ---------------------------------------------------------------------
     def prepare(self, run: Run, request_id: str) -> list[OutreachRecord]:
         """Create one outreach record per opted-in phone for a newly approved request.
@@ -270,6 +327,7 @@ class OutreachService:
                 hospital_id=request.hospital_id,
                 body=body,
                 created_at=now,
+                channel="shared" if self.shared else "console",
             )
             for phone in self.config.allowed_phones
         ]
@@ -282,7 +340,10 @@ class OutreachService:
         """Send prepared messages (blocking; run in a worker thread)."""
         for r in records:
             assert self.client is not None
-            result = self.client.send(r.phone, r.body)
+            if self.shared:  # Idempotency-Key = outreach id: a retry can never send twice
+                result = self.client.send(r.phone, r.body, idempotency_key=r.outreach_id)
+            else:
+                result = self.client.send(r.phone, r.body)
             with self._lock:
                 r.send_ms = result.latency_ms
                 if result.ok:
@@ -369,9 +430,14 @@ class OutreachService:
         if event.text.strip().casefold() != CONFIRM_REPLY:
             return self._done(event, 200, "not_confirmation_text", "only 'IN' confirms",
                               record=record)  # fmt: skip
+        if (event.created_at is not None and record.sent_at is not None
+                and event.created_at < record.sent_at - REPLY_CLOCK_TOLERANCE):  # fmt: skip
+            return self._done(event, 200, "stale_request", "reply predates our message",
+                              record=record)  # fmt: skip
         try:
             run, _ = self.demo.confirm_live(
-                record.run_id, record.request_id, record.staff_id, record.display_name, "IN"
+                record.run_id, record.request_id, record.staff_id, record.display_name, "IN",
+                source="imessage" if record.channel == "shared" else "webhook",
             )
         except (ConflictError, NotFoundError) as exc:
             return self._done(event, 200, "rejected_request", str(exc), record=record)
@@ -395,3 +461,82 @@ class OutreachService:
                 if r.phone == sender:
                     return r
         return None
+
+    # --- shared line: inbound by polling ----------------------------------------------------
+    def _shared_event(self, m: SharedMessage) -> InboundEvent:
+        return InboundEvent(
+            event_id=f"shared:{m.message_id}", event_type="message.received", chat_id=None,
+            message_id=m.message_id,
+            direction=None if m.inbound is None else ("inbound" if m.inbound else "outbound"),
+            sender=m.peer, is_me=m.inbound is False, text=m.text, created_at=m.created_at,
+        )  # fmt: skip
+
+    def prime_shared(self) -> int:
+        """Before sending: mark every message already on the line as seen, so an old "IN"
+        can never confirm a new request. Returns how many were marked."""
+        if not self.shared:
+            return 0
+        result = self.client.list_messages()
+        if not result.ok:
+            return 0
+        with self._lock:
+            for m in result.messages:
+                self._seen.setdefault(f"shared:{m.message_id}", ("baseline", None))
+            self.last_poll_fields = result.field_names
+        return len(result.messages)
+
+    def awaiting_shared(self) -> bool:
+        """True while a sent shared-line message waits for a reply on the active run."""
+        if not self.shared:
+            return False
+        run = self.demo.active_run()
+        with self._lock:
+            records = [
+                r
+                for r in self._records.values()
+                if r.channel == "shared" and r.run_id == run.run_id and r.status == "sent"
+            ]
+        for r in records:
+            req = run.staffing_requests.get(r.request_id)
+            if req is not None and self.demo.request_status(req) in (
+                "awaiting_replies", "partially_confirmed"
+            ):
+                return True
+        return False
+
+    def poll_shared(self) -> list[WebhookOutcome]:
+        """One poll of GET /shared-messages. Each new message is processed once (deduplicated
+        on Chert's message id) through the same rules as a webhook delivery."""
+        if not self.shared:
+            return []
+        result = self.client.list_messages()
+        self.last_poll_at = self.clock()
+        if not result.ok:
+            log.warning("shared-messages poll failed", extra={"error": result.error})
+            return []
+        self.last_poll_fields, self.poll_unparsed = result.field_names, result.unparsed
+        outcomes = []
+        # Oldest first, so replies are handled in the order they were sent.
+        earliest = datetime.min.replace(tzinfo=UTC)
+        ordered = sorted(result.messages, key=lambda m: m.created_at or earliest)
+        for m in ordered:
+            key = f"shared:{m.message_id}"
+            with self._lock:
+                if key in self._seen:
+                    continue
+                if m.inbound is False:
+                    self._seen[key] = ("ignored_outbound", None)
+                    continue
+                started = time.perf_counter()
+                event = self._shared_event(m)
+                outcome = self._process(event)
+                outcome.channel, outcome.signature_valid = "shared_poll", False
+                outcome.processing_ms = round((time.perf_counter() - started) * 1000, 2)
+                self._seen[key] = (outcome.outcome, outcome.record)
+                while len(self._seen) > SEEN_EVENTS_MAX:
+                    self._seen.popitem(last=False)
+                self.counters[outcome.outcome] = self.counters.get(outcome.outcome, 0) + 1
+                self.last_webhook = outcome
+            log.info("shared reply", extra={"outcome": outcome.outcome, "message_id": m.message_id})
+            outcomes.append(outcome)
+        return outcomes

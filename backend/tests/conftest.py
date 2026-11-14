@@ -10,7 +10,10 @@ import os
 os.environ["DATABASE_URL"] = ""
 # Never use real Chert credentials or phone numbers in tests (Phase 6).
 for _key in ("CHERT_SIGNING_SECRET", "CHERT_TENANT", "CHERT_WEBHOOK_SECRET",
-             "DEMO_ALLOWED_PHONES", "PUBLIC_BASE_URL", "CHERT_API_BASE"):  # fmt: skip
+             "DEMO_ALLOWED_PHONES", "PUBLIC_BASE_URL", "CHERT_API_BASE",
+             "TRIAGEX_AGENT_TOKEN", "CHERT_API_KEY", "CHERT_PROJECT_ID", "CHERT_LINE_ID",
+             "CHERT_SHARED_API_BASE", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL",
+             "GEMINI_FALLBACK_MODEL"):  # fmt: skip
     os.environ[_key] = ""
 
 import logging  # noqa: E402
