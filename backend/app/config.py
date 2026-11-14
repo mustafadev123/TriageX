@@ -11,6 +11,7 @@ APP_NAME = "TriageX"
 TAGLINE = "Every ER capacity tool shows you the problem. TriageX calls the people who can fix it."
 SYNTHETIC_DATA_NOTICE = "Synthetic hospital operations simulation — not real-time hospital data."
 DEMO_MESSAGE_PREFIX = "TriageX DEMO"
+ENGINE_VERSION = "0.4.0"
 
 
 class Settings(BaseSettings):
@@ -21,8 +22,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:5173"
 
-    # Tiger Data (Phase 4)
+    # Tiger Data (Phase 4). Empty or unset = run without a database.
     database_url: str | None = None
+    database_schema: str | None = None  # defaults to the server's search_path (public)
+    database_pool_size: int = 3
+    database_timeout_seconds: float = 10.0
 
     # AI providers (Phase 5)
     openai_api_key: str | None = None

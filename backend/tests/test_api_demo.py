@@ -376,7 +376,9 @@ def test_reference_endpoints(client):
 def test_integration_health_never_claims_unbuilt_integrations(client):
     h = client.get("/api/integrations/health").json()
     assert h["simulation"]["status"] == "ok"
-    for key in ("database", "ai_primary", "ai_fallback", "messaging"):
+    # No DATABASE_URL in tests: implemented but not configured, never "ok".
+    assert h["database"]["status"] == "not_configured"
+    for key in ("ai_primary", "ai_fallback", "messaging"):
         assert h[key]["status"] == "not_implemented"
 
 

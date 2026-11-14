@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.models.dashboard import DashboardState, Diagnostics
+from app.repositories.persistence import build_snapshot
 from app.services.dashboard import build_dashboard, build_diagnostics
 from app.services.demo_service import (
     DEFAULT_SCENARIO_ID,
@@ -17,6 +20,7 @@ from app.services.demo_service import (
 from app.simulation.scenarios import SCENARIOS
 
 router = APIRouter(tags=["runs"])
+log = logging.getLogger("triagex.api")
 
 
 class RunRequest(BaseModel):
@@ -57,6 +61,25 @@ def _raise(exc: Exception) -> None:
     raise exc
 
 
+def _persist(request: Request, run, state: DashboardState, reason: str) -> None:
+    """Queue a snapshot for Tiger Data. The response never waits for the database, and a
+    persistence problem can never fail or alter the request."""
+    writer = request.app.state.persistence
+    if not writer.enabled:
+        return
+    try:
+        writer.submit(build_snapshot(run, state, reason))
+    except Exception:
+        log.exception("could not queue persistence snapshot", extra={"run_id": run.run_id})
+
+
+async def _respond(request: Request, run, reason: str) -> DashboardState:
+    state = build_dashboard(_service(request), run)
+    _persist(request, run, state, reason)
+    await _notify(request, run, reason)
+    return state
+
+
 async def _notify(request: Request, run, reason: str) -> None:
     await request.app.state.ws_manager.broadcast(
         {
@@ -76,8 +99,7 @@ async def reset_demo(request: Request, body: RunRequest | None = None) -> Dashbo
     _check_scenario(body.scenario_id)
     service = _service(request)
     run = service.reset(body.scenario_id, body.seed)
-    await _notify(request, run, "reset")
-    return build_dashboard(service, run)
+    return await _respond(request, run, "reset")
 
 
 @router.get("/demo/state")
@@ -91,8 +113,7 @@ async def create_run(request: Request, body: RunRequest) -> DashboardState:
     _check_scenario(body.scenario_id)
     service = _service(request)
     run = service.create_run(body.scenario_id, body.seed)
-    await _notify(request, run, "run_created")
-    return build_dashboard(service, run)
+    return await _respond(request, run, "run_created")
 
 
 @router.get("/runs/{run_id}")
@@ -121,8 +142,7 @@ async def approve_proposal(
         run, _ = service.approve_proposal(run_id, proposal_id, body.at_tick, body.operator)
     except (NotFoundError, ConflictError) as exc:
         _raise(exc)
-    await _notify(request, run, "proposal_approved")
-    return build_dashboard(service, run)
+    return await _respond(request, run, "proposal_approved")
 
 
 @router.post("/runs/{run_id}/staffing-requests/{request_id}/simulate-reply")
@@ -136,5 +156,4 @@ async def simulate_reply(
         run, _ = service.simulate_reply(run_id, request_id, body.staff_id, body.reply)
     except (NotFoundError, ConflictError) as exc:
         _raise(exc)
-    await _notify(request, run, "staff_confirmed")
-    return build_dashboard(service, run)
+    return await _respond(request, run, "staff_confirmed")

@@ -17,7 +17,9 @@ the modeled before-versus-after outcome.
 - Phase 1 (repository setup) is complete.
 - Phase 2 (deterministic simulation engine) is complete.
 - Phase 3 (FastAPI dashboard API and WebSocket) is complete.
-- The database, AI and messaging integrations are not implemented yet.
+- Phase 4 (Tiger Data persistence) is implemented and verified on local PostgreSQL. Live
+  Tiger Data verification needs `DATABASE_URL`; see [docs/database.md](docs/database.md).
+- The AI and messaging integrations are not implemented yet.
 
 See [docs/plan.md](docs/plan.md) for the plan,
 [docs/assumptions.md](docs/assumptions.md) for every simulation assumption, and
@@ -77,6 +79,6 @@ The dashboard is at http://localhost:5173 and proxies `/api` and `/ws` to the ba
 ## Test
 
 ```powershell
-cd backend;  uv run pytest;  uv run ruff check .
+cd backend;  uv run pytest;  uv run ruff check .   # DB tests start a local PostgreSQL
 cd frontend; npm test;       npm run build
 ```

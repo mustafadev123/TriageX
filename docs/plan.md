@@ -79,6 +79,15 @@ TriageX/
 
 ## C. Database design
 
+Implemented in Phase 4. The authoritative description is [database.md](database.md).
+Changes from this plan:
+
+- Added `run_versions` and `comparison_metrics`.
+- Deferred `outreach_events` and `webhook_events` (Phase 6), `ai_briefs` (Phase 5) and
+  `transfer_events`.
+- `hospital_metrics` keeps every Track B recalculation as its own `series_version`.
+- The driver is `pg8000`, because Windows Application Control blocks psycopg's DLL.
+
 | Table | Key | Notes |
 |---|---|---|
 | `hospitals` | `hospital_id` | name, lat/lon, synthetic capacity |
