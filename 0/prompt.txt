@@ -1,0 +1,993 @@
+<pasted_content id="a80e">
+Phase 1 is approved.
+
+I have renamed the GitHub repository to TriageX, updated the Git remote, and enabled Entire. Please verify each of those before proceeding.
+
+Now:
+
+1. Run `git status` and verify no credentials, `.env` files, or virtual environments are staged.
+2. Re-run the backend and frontend tests.
+3. Stage and commit the Phase 1 implementation with the message `chore: initialize TriageX monorepo and development environment`.
+4. Verify the commit exists and inspect Entire's checkpoint/session tracking status.
+5. Report whether Entire successfully captured the Claude Code development session. Do not claim it did unless verified.
+6. Report the final Git status and commit hash.
+
+Do not begin Phase 2 yet. Wait for my approval.
+</pasted_content id="a80e">
+
+---
+
+it has been pushed
+
+---
+
+so do that
+
+---
+
+<pasted_content id="a80e">
+# TriageX — Approve Phase 2: Deterministic Simulation Engine
+
+Phase 1 is approved and complete. GitHub and Entire checkpoints are synced.
+
+You are now authorized to implement **Phase 2 only**, following `docs/plan.md`.
+
+## Objective
+
+Build a reproducible hospital surge simulation that supports our central demo:
+
+**One surge. Two futures.**
+
+The same synthetic patient arrivals and initial hospital conditions must produce two comparable tracks:
+
+- **Baseline:** Ordinary reactive hospital operations, including realistic diversion.
+- **With TriageX:** The same operations, plus explicitly approved and confirmed interventions.
+
+No artificial improvements, hardcoded outcomes, or hidden advantages.
+
+## Implementation requirements
+
+### 1. Hospital network
+
+Model the five Atlanta hospital locations already defined in our plan.
+
+Use synthetic staffing, treatment-space capacity, arrivals, and service times. Do not represent these values as actual hospital conditions.
+
+### 2. Simulation engine
+
+Implement the planned 15-minute tick engine, with a 24-hour simulation horizon and support for displaying a six-hour demo window.
+
+Use deterministic random generation and stable ordering.
+
+The engine must support identical replay from the same scenario, seed, and intervention list.
+
+### 3. Two simulation tracks
+
+Track A and Track B must be identical when no interventions exist.
+
+They must remain identical until a TriageX intervention actually becomes effective.
+
+### 4. Staffing intervention
+
+Use the Phase 0 plan's 45-minute simulated staffing lead time.
+
+A staff confirmation may increase staffed capacity only when physical treatment spaces are available.
+
+The intervention must not instantly reduce queues when the confirmation arrives.
+
+### 5. Surge scenarios
+
+Implement the four planned synthetic scenarios:
+
+- I-85 Multi-Vehicle Pileup
+- Big Game Downtown
+- Summer Heat Wave
+- Respiratory Wave
+
+Prioritize making the I-85 scenario credible and deterministic.
+
+### 6. Forecasting
+
+Implement the planned two-hour-ahead projection using only information available at the current simulated time.
+
+Forecasts must not inspect future patient arrivals.
+
+Keep forecasts separate from actual future outcomes.
+
+### 7. Computed metrics
+
+Calculate all results from simulation state and patient events.
+
+Include:
+
+- Hospital saturation
+- Queue lengths
+- Patient waiting times
+- Ambulance handoff waiting hours
+- Diversion events
+- Staff utilization
+- Intervention effectiveness
+
+Never hardcode percentage improvements.
+
+### 8. Demo-specific requirements
+
+The engine must support:
+
+- A shared timeline for both tracks.
+- A visible intervention approval time.
+- A 45-minute simulated lead-time window.
+- A shift-active marker.
+- Recalculation of Track B after a confirmation.
+- A six-hour view of the complete scenario.
+
+The eventual UI should be able to show two curves separating only after an intervention becomes effective.
+
+### 9. Testing
+
+Write meaningful automated tests covering:
+
+- Deterministic replay.
+- Baseline equality without interventions.
+- No effect before intervention activation.
+- Staffing constrained by physical capacity.
+- Correct ambulance handoff calculations.
+- Forecast isolation from future arrivals.
+- Consistent results across scenarios.
+
+Run pytest, Ruff, and any other applicable checks.
+
+## Important constraints
+
+- Do not begin Phase 3.
+- Do not modify frontend architecture.
+- Do not integrate Chert, Tiger Data, OpenAI, or Gemini yet.
+- Do not change the existing approved project structure without explaining why.
+- Preserve Entire tracking.
+- Keep the simulation independent of external APIs.
+- Do not manufacture favorable results.
+
+## Final report
+
+When finished, provide:
+
+1. Files created or modified.
+2. Simulation architecture.
+3. Example I-85 scenario output with actual computed metrics.
+4. Test results.
+5. Performance measurements.
+6. Known limitations.
+7. Whether the planned live demo is supported.
+8. Git commit hash and Entire checkpoint status.
+
+Commit Phase 2 as a separate Git checkpoint, push it, and verify that Entire synced successfully.
+
+**Stop after Phase 2 and wait for approval before proceeding.**
+</pasted_content id="a80e">
+
+---
+
+<pasted_content id="a80e">
+## Hackathon Demo and Pitch Priority — Critical
+
+TriageX is being built for a live hackathon presentation. Our primary goal is to demonstrate a compelling, visually clear, end-to-end hospital surge coordination system.
+
+Every backend decision should support the following experience:
+
+**Surge predicted → Human approves outreach → Staff confirms → Intervention becomes active → Two simulated futures visibly diverge → Measurable impact appears.**
+
+Design the API responses so the frontend can deliver this entire experience on a single screen without unnecessary navigation or waiting.
+
+Specifically:
+
+1. **Cinematic demo progression:** Return the data needed for a smooth timeline replay, including hospital status transitions, forecast alerts, approval events, confirmation events, staffing lead-time bands, shift-start markers, and comparison curves.
+
+2. **Strong visual storytelling:** Make it straightforward for the frontend to animate the transition from identical baseline and intervention curves to visibly different outcomes after the intervention becomes active.
+
+3. **Hero metrics:** Prioritize ambulance handoff hours, patient waiting time, and hospital recovery. Return computed absolute differences and percentage changes so the frontend doesn't need to calculate them.
+
+4. **Instant interaction:** Aim for the confirmed staffing response to trigger an updated comparison in under 200 ms locally. Measure the actual latency rather than assuming it.
+
+5. **Six-hour demo window:** Provide a ready-to-render six-hour timeline for the I-85 scenario, while preserving the underlying 24-hour simulation.
+
+6. **Single-screen presentation:** Design response schemas for a dashboard containing an Atlanta hospital map, synchronized comparison charts, a live coordination feed, and one prominent impact metric.
+
+7. **Reliable demo reset:** Support returning the application to the same initial scenario and timeline so we can rehearse the presentation repeatedly.
+
+8. **Presentation-friendly event labels:** Provide concise event titles such as "Surge Predicted," "Outreach Approved," "Staff Confirmed," and "Shift Active."
+
+9. **Authentic results:** All metrics must come from the simulation. Never fabricate improvements, modify historical results, or make the intervention appear effective before its simulated activation time.
+
+10. **Keep technical limitations out of the main demo narrative:** Present the strongest verified capabilities and computed results prominently. Keep engineering diagnostics available for development and judge Q&A, rather than cluttering the presentation screen.
+
+The desired result is not simply a functioning API. It is an API specifically designed to power a memorable, polished, 90-second live demonstration.
+
+Do not implement the frontend during Phase 3. Just make sure the API supports this experience.
+</pasted_content id="a80e">
+
+---
+
+<pasted_content id="a80e">
+Phase 3 implementation is approved, pending a final timeline consistency check.
+
+Before committing, verify one detail:
+
+Phase 2 reported the I-85 proposal at 16:15, operator approval at 16:30, and shift activation at 17:15.
+
+Phase 3 reports the proposal at 16:15 and shift activation at 17:00.
+
+Please determine whether this is an intentional change or whether proposal creation time is incorrectly being used as approval time.
+
+The 45-minute lead time must start from the actual operator approval timestamp, not the proposal timestamp. Ensure the API, event feed, timeline bands, simulation engine, and tests agree.
+
+Also verify that:
+- Each simulated confirmation recomputes Track B without changing the baseline.
+- The displayed impact metrics are calculated from the same comparison data returned to the frontend.
+- A simulated reply is never presented as a real Chert message.
+- The 25–30 ms measurement represents the actual API round trip, not just engine execution.
+
+If the timeline needs correction, fix it and rerun the relevant tests.
+
+Then:
+
+1. Run all backend tests, Ruff checks, frontend tests, and frontend build.
+2. Commit Phase 3 separately with message `feat: add TriageX live simulation API`.
+3. Push to GitHub.
+4. Verify the Entire checkpoint is synced.
+5. Report the commit hash, checkpoint status, final test results, and confirmed approval/activation timeline.
+
+Do not begin Phase 4 yet. Wait for my approval.
+</pasted_content id="a80e">
+
+---
+
+<pasted_content id="a80e">
+# TriageX — Approve Phase 4: Tiger Data Persistence
+
+Phase 3 is approved and complete.
+
+The simulation API, corrected intervention timeline, automated tests, Git commits and Entire checkpoints are verified according to the Phase 3 report.
+
+You are authorized to implement **Phase 4 only**, following `docs/plan.md`.
+
+## Primary objective
+
+Integrate Tiger Data PostgreSQL/TimescaleDB into TriageX to persist simulation runs, hospital metrics, staffing coordination events, and intervention outcomes.
+
+The database should strengthen our technical architecture and provide real evidence for sponsor judging without slowing down the 90-second live demo.
+
+## Implementation priorities
+
+### 1. Database connection
+
+- Use Tiger Data PostgreSQL with environment-based credentials.
+- Never commit connection strings, passwords or API keys.
+- Use a small, reliable connection pool.
+- Provide a database health check that reflects actual connectivity.
+- Preserve existing `not_implemented` status until connectivity is verified.
+
+### 2. Database schema
+
+Implement the schema from `docs/plan.md`, including the relevant entities:
+
+- Hospitals
+- Scenarios
+- Simulation runs
+- Hospital time-series metrics
+- Staffing requests
+- Staff confirmations
+- Outreach events
+- Intervention events
+- Agent activity
+
+Use TimescaleDB hypertables where supported and appropriate for hospital time-series data.
+
+Do not create unnecessary tables merely to match the plan if they serve no implemented Phase 4 functionality; document any deferrals.
+
+### 3. Persistence behavior
+
+- Persist simulation run metadata and seed.
+- Persist hospital-level metrics across the simulation timeline.
+- Persist approval, confirmation and activation events.
+- Persist computed comparison metrics.
+- Preserve the distinction between baseline and TriageX tracks.
+- Make writes idempotent where possible.
+- Ensure a failed database write cannot silently corrupt the in-memory simulation state.
+
+### 4. Demo performance
+
+The current live API responds to confirmations in approximately 25–30 ms.
+
+Preserve fast dashboard updates.
+
+Do not require the frontend to wait for a full database write before displaying a recalculated comparison.
+
+If using asynchronous persistence, make failures visible in diagnostics and verify that queued writes are eventually stored.
+
+### 5. Sponsor demonstration
+
+Provide at least one meaningful Tiger Data query that demonstrates actual stored simulation data.
+
+For example:
+
+- Hospital saturation over time.
+- Baseline versus TriageX capacity.
+- Intervention events correlated with recovery.
+- Ambulance handoff metrics across a simulation run.
+
+The output must be based on actual persisted rows, not hardcoded examples.
+
+### 6. Reliability
+
+- Preserve the deterministic simulation engine.
+- Do not modify calibrated scenario assumptions.
+- Avoid breaking the existing Phase 3 API contracts.
+- Provide a clean database initialization or migration command.
+- Handle database unavailability gracefully.
+- Support local development without Tiger Data credentials.
+
+### 7. Testing
+
+Add tests for:
+
+- Database connection health.
+- Schema migrations.
+- Simulation persistence.
+- Event persistence.
+- Baseline/intervention separation.
+- Idempotent writes.
+- Database failure behavior.
+- Stored metrics matching the engine.
+
+Preserve all 109 existing backend tests.
+
+### 8. Scope constraints
+
+Do not implement Chert, OpenAI, Gemini or frontend dashboard components.
+
+Do not begin Phase 5 or Phase 6.
+
+Keep the work focused and avoid unnecessary infrastructure.
+
+## Final acceptance report
+
+Provide:
+
+1. Files created or modified.
+2. Database schema and migrations.
+3. Connection status: verified live Tiger Data or local-only.
+4. Actual rows written and queried.
+5. Example SQL queries and results.
+6. API performance after persistence.
+7. Tests and lint results.
+8. Known technical limitations and any deferred work.
+9. Git commit hash and Entire checkpoint status.
+
+If Tiger Data credentials are unavailable, complete the implementation and local tests, clearly identify what requires live verification, and stop rather than inventing a successful connection.
+
+Once tested, commit Phase 4 separately, push it, verify Entire synchronization, and wait for approval before continuing.
+</pasted_content id="a80e">
+
+---
+
+<pasted_content id="a80e">
+# TriageX — Frontend Phase: Build the Hackathon-Winning Live Demo
+
+## Project status
+
+Phases 1–4 are complete.
+
+- Deterministic simulation engine implemented and tested.
+- FastAPI supports live scenario replay, approvals, confirmations, and recalculated comparisons.
+- Tiger Data integration verified against the real cloud service: 7/7 checks passed, including TimescaleDB hypertable verification and 2,742 persisted rows.
+- GitHub and Entire checkpoints are synced.
+
+You are authorized to implement the **Frontend Dashboard Phase only**.
+
+Read `docs/plan.md` and `docs/api.md` before implementation. Inspect the actual API responses and reuse their existing schemas.
+
+Do not begin Chert, OpenAI, or Gemini integration in this phase.
+
+---
+
+## 1. Our goal: Win the live demonstration
+
+TriageX must be more than a functional dashboard.
+
+We are presenting to hackathon judges with approximately **90 seconds for the live demo**.
+
+The judges should immediately understand:
+
+**"Every ER capacity tool shows you the problem. TriageX calls the people who can fix it."**
+
+Our central experience:
+
+**One surge. Two futures. One confirmed response that changes the outcome.**
+
+The demo must feel like a polished, credible healthcare operations command center.
+
+The three major visual moments are:
+
+1. An Atlanta hospital network reacting to an emergency surge.
+2. A staff outreach request being approved and a confirmation appearing live.
+3. Two simulation futures separating after the additional staff become effective, revealing measurable improvements.
+
+Make these moments visually memorable.
+
+---
+
+## 2. Visual design: Premium command center
+
+Build a sophisticated, dark-mode healthcare operations interface.
+
+Use React, TypeScript, Tailwind and Recharts, consistent with the existing stack.
+
+Design direction:
+
+- Dark navy/charcoal background.
+- Clean, premium typography.
+- High-contrast status indicators.
+- Restrained cyan/teal for TriageX.
+- Warm orange/red for overloaded hospitals and baseline pressure.
+- Smooth, purposeful transitions.
+- Subtle glowing highlights around active events.
+- Minimal clutter and excellent readability on a projector.
+
+Avoid a generic admin dashboard, excessive cards, tiny labels, decorative animations, or unnecessary navigation.
+
+### Screen layout
+
+**Left: Atlanta hospital network**
+
+Show the five modeled hospitals on a geographically meaningful map or clearly labeled schematic.
+
+Hospital markers must reflect the selected simulation time:
+
+- Normal capacity
+- Approaching capacity
+- Overloaded
+- Diverting
+- Recovering
+
+Show selected-hospital details, including occupancy/saturation, staffing and status.
+
+Do not invent geographic coordinates or hospital metrics. Use grounded locations and API data.
+
+**Center: Two Futures comparison**
+
+This is the largest and most visually important element.
+
+Display baseline versus TriageX on synchronized time axes.
+
+Use a shared timeline and cursor.
+
+Include:
+
+- Baseline and intervention curves.
+- Surge markers.
+- Forecast warning markers.
+- Approval marker.
+- Shaded 45-minute staffing lead-time region.
+- Shift Active marker.
+- Futures Diverge marker.
+- Clear legends and hover tooltips.
+
+Prefer an overlaid chart where the difference is immediately visible. Use separate aligned charts if different metrics require different units.
+
+**Right: Live coordination feed**
+
+Show the operational workflow:
+
+- Surge Predicted
+- Outreach Proposed
+- Outreach Approved
+- Staff Confirmed
+- Staff En Route
+- Shift Active
+- Capacity Recalculated
+- Futures Diverge
+- Back to Normal
+
+Include a prominent approval action and a live confirmation counter.
+
+**Hero metric**
+
+Prominently display ambulance-hours saved, calculated from the API.
+
+For the currently verified I-85 seed 42 scenario, the backend reports approximately 9.25 ambulance handoff hours saved with three confirmed staff.
+
+Do not hardcode this number. Read it from the API and format it appropriately.
+
+Show secondary metrics such as average wait reduction and recovery time only when they help the story.
+
+---
+
+## 3. WOW FACTOR #1 — Cinematic surge replay
+
+The presenter selects:
+
+**I-85 Multi-Vehicle Pileup**
+
+Seed: 42
+
+Demo window: 15:00–21:00 simulated time.
+
+The interface starts in a clean, calm state.
+
+As the presenter advances the timeline:
+
+1. The simulated pileup begins.
+2. Hospital pressure increases.
+3. Hospital markers transition toward warning/critical states.
+4. TriageX surfaces the surge forecast.
+5. The coordination feed proposes additional staff at Grady.
+
+The viewer should understand the emerging crisis without reading a paragraph of text.
+
+Include a dotted two-hour forecast in an appropriate capacity chart, visually distinguished from actual observed results.
+
+Use only the backend's forecast values.
+
+---
+
+## 4. WOW FACTOR #2 — A confirmation that changes everything
+
+This is the signature interaction of TriageX.
+
+At simulated 16:30, the operator approves:
+
+**Call in 3 staff at Grady**
+
+The dashboard immediately shows:
+
+- Outreach Approved
+- Awaiting Confirmations
+- Staff Confirmed: 0/3
+- Shift activation scheduled for 17:15
+
+For this frontend phase, implement a clearly labeled **Simulate Staff Reply** fallback using the existing API.
+
+Each simulated confirmation must:
+
+1. Call the real backend endpoint.
+2. Update the confirmed staff count.
+3. Add an event to the coordination feed.
+4. Receive the recomputed TriageX track.
+5. Update the displayed comparison data.
+6. Preserve the baseline track.
+7. Show the additional expected impact without implying that the shift is already active.
+
+Do not fake Chert integration.
+
+### Future Chert compatibility
+
+Architect the frontend so that the exact same UI updates when a real Chert webhook later confirms a teammate's iMessage reply of `IN`.
+
+The later Chert phase must not require redesigning the dashboard.
+
+A real confirmation should be distinguishable from a simulated fallback in the feed.
+
+The Chert interaction will eventually be:
+
+**Approve outreach → Teammate receives iMessage → Replies IN → Chert webhook → TriageX updates → Two futures diverge.**
+
+Do not claim that this live message path works until Phase 6 verifies it.
+
+---
+
+## 5. WOW FACTOR #3 — The two futures diverge
+
+This is the emotional and visual climax.
+
+Before the intervention becomes effective, both simulation tracks must remain identical.
+
+At simulated **17:15**, the three confirmed staff become active.
+
+The dashboard should clearly display:
+
+**SHIFT ACTIVE — GRADY**
+
+Then show the two futures separating as the simulated timeline advances.
+
+The baseline should continue along its actual computed trajectory.
+
+The TriageX curve should follow the recomputed intervention trajectory.
+
+Animate the reveal using the backend's real data. Never manufacture a visual difference.
+
+### Visual emphasis
+
+At the divergence moment:
+
+- Highlight the Shift Active marker.
+- Subtly illuminate the TriageX curve.
+- Emphasize the separation between the curves.
+- Update the cumulative ambulance-hours-saved counter according to the playhead.
+- Show recovery events when they occur.
+
+The presentation should communicate:
+
+**Same emergency. Same patient arrivals. A different operational response.**
+
+### Critical time integrity
+
+Keep the verified timeline:
+
+- 16:15 — Surge Predicted / proposal generated.
+- 16:30 — Human approves outreach.
+- 16:30 — Demo confirmations recorded.
+- 17:15 — Confirmed staff begin their simulated shift.
+- After activation — The intervention's effect becomes visible.
+
+Approval and confirmation must not be confused with immediate capacity improvement.
+
+---
+
+## 6. Presentation Mode — Essential
+
+Implement a dedicated **Demo Mode** for the 90-second stage presentation.
+
+Provide a prominent **Next Event** control.
+
+The presenter should be able to progress through the complete experience with minimal clicking.
+
+Suggested sequence:
+
+1. Start Surge
+2. Show Prediction
+3. Approve Outreach
+4. Receive Confirmations
+5. Activate Shift
+6. Reveal Impact
+
+These are presentation steps, not separate hardcoded simulation events.
+
+Use actual API timestamps and state transitions.
+
+The Next Event control may advance the playhead, but it must not silently approve outreach or simulate a reply without a clear, intentional presenter action.
+
+Include:
+
+- Play/pause.
+- Timeline scrubber.
+- Reset Demo.
+- Next Event.
+- Optional speed adjustment.
+- Presentation/fullscreen layout.
+
+The entire demo must be comfortably executable in 90 seconds.
+
+The presenter must never have to search through menus or manually type a timestamp.
+
+---
+
+## 7. Prevent spoilers
+
+Before a staff confirmation, the comparison should appear identical.
+
+After confirmation, the API may already contain the recomputed future, but the dashboard must reveal that future progressively as the playhead moves.
+
+Do not display the final improvement before the intervention becomes effective.
+
+Use the API's cumulative impact values for the current playhead.
+
+When the presenter advances past 17:15, the audience should see the difference emerge.
+
+A full future comparison can be available in a separate analysis view, but it should not spoil the live reveal.
+
+---
+
+## 8. Demo reliability and performance
+
+Optimize for a laptop connected to a projector.
+
+The main experience must fit above the fold at 1366×768 and 1920×1080.
+
+Ensure:
+
+- No horizontal scrolling.
+- Large, readable labels.
+- Responsive chart dimensions.
+- Reliable demo reset.
+- Clear API loading states.
+- Graceful backend error handling.
+- Smooth updates after confirmation.
+- No unnecessary full-page reloads.
+- Consistent visual behavior across repeated runs.
+
+The current backend confirmation endpoint responds in approximately 25–30 ms under typical measured conditions.
+
+Preserve that responsiveness and avoid introducing unnecessary frontend delays.
+
+### Fallback behavior
+
+If the eventual live Chert integration fails during the hackathon, the presenter must be able to use the clearly labeled simulated reply workflow without restarting the demo.
+
+Do not add fake webhook events or misleading integration status.
+
+---
+
+## 9. Sponsor and technical details
+
+Keep the primary presentation focused on the product.
+
+Make technical information accessible in a secondary diagnostics or technical view:
+
+- Tiger Data persistence status.
+- Database run identifiers and stored metrics.
+- Entire development checkpoint evidence.
+- AI provider status (when implemented).
+- Chert connection status (when implemented).
+
+Do not crowd the main command-center interface with technical diagnostics.
+
+The dashboard must retain a small, clear notice that the hospital data and scenarios are synthetic.
+
+---
+
+## 10. Engineering constraints
+
+- Use the existing FastAPI endpoints.
+- Inspect and follow `docs/api.md`.
+- Do not rewrite the simulation engine.
+- Do not change the approved I-85 scenario.
+- Do not hardcode improvements.
+- Do not fabricate hospital data or future curves.
+- Do not begin Chert or AI integration.
+- Keep backend and frontend concerns separated.
+- Preserve the existing test suite.
+- Add automated tests for the main demo interaction.
+
+Use actual backend events and timestamps rather than creating a separate fictional timeline in React.
+
+---
+
+## 11. Acceptance criteria
+
+Before considering this phase complete, demonstrate:
+
+1. A working single-screen dashboard.
+2. All five hospitals represented.
+3. A real API-backed I-85 scenario.
+4. A working Next Event presentation control.
+5. An approval action at 16:30.
+6. Three simulated confirmations through the backend.
+7. Identical futures before 17:15.
+8. Visible divergence after 17:15.
+9. Correct cumulative and final impact metrics.
+10. A functioning six-hour timeline scrubber.
+11. Reliable reset and replay.
+12. No fabricated Chert, Tiger Data or AI status.
+13. Readable layout at 1366×768.
+14. A complete 90-second rehearsal.
+
+Add tests that verify these behaviors, especially the absence of premature impact or curve divergence.
+
+---
+
+## 12. Final report
+
+When complete, provide:
+
+1. Files created or modified.
+2. Screenshots at initial state, approval, confirmation and divergence.
+3. A description of the visual design.
+4. Step-by-step 90-second demo walkthrough.
+5. Evidence that all chart values come from the API.
+6. Tests, lint and build results.
+7. Performance measurements.
+8. Remaining issues requiring attention.
+9. Git commit hash.
+10. Entire checkpoint sync status.
+
+Run the complete test suite.
+
+Commit and push this frontend phase separately and verify Entire synchronization.
+
+**Stop after the frontend phase and await approval. Do not begin Chert or AI integration.**
+</pasted_content id="a80e">
+
+---
+
+now what is left
+
+---
+
+<pasted_content id="a80e">
+# TriageX — Approve Phase 6: Live Chert Integration
+
+Phase 6 is approved. Prioritize the live iMessage interaction because it is the central wow factor of our hackathon demonstration.
+
+## Objective
+
+Complete this real-world interaction:
+
+**Operator approves outreach → Chert sends iMessage → Opted-in teammate replies IN → Signed webhook confirms staff → TriageX recomputes the intervention track → Dashboard updates.**
+
+The same dashboard must continue supporting the clearly labeled simulated fallback.
+
+## Requirements
+
+1. Read `docs/plan.md`, `docs/api.md`, and the existing dashboard implementation before making changes.
+2. Verify Chert's actual API and webhook documentation. Do not assume endpoint paths, payload fields, authentication, or signature format.
+3. Send outreach messages prefixed `TriageX DEMO` only to explicitly opted-in recipients.
+4. Include a 10-minute expiry and an unambiguous response instruction.
+5. Verify inbound webhook signatures before processing replies.
+6. Accept only valid `IN` confirmations from the correct recipient and active request.
+7. Prevent duplicate confirmations from webhook retries.
+8. Record outbound outreach and inbound webhook events in Tiger Data.
+9. Use the existing confirmation service so real replies and simulated replies update the same simulation state.
+10. Preserve the corrected simulated timeline: approval at 16:30, shift activation at 17:15.
+11. Push confirmation updates to the frontend through the existing WebSocket mechanism.
+12. Distinguish live Chert confirmations from simulated confirmations in the dashboard.
+13. Keep a clearly labeled simulated fallback available.
+14. Never claim Chert is connected unless an actual integration check succeeds.
+
+## Demo acceptance test
+
+With an opted-in iPhone:
+
+1. Reset the I-85 scenario.
+2. Advance to simulated 16:30.
+3. Approve outreach.
+4. Confirm the iMessage arrives.
+5. Reply `IN`.
+6. Verify the signed webhook is accepted.
+7. Verify the staff confirmation appears on the dashboard within five seconds of webhook receipt.
+8. Verify the baseline remains unchanged.
+9. Advance the simulated timeline to 17:15.
+10. Verify the two futures visibly diverge and impact metrics update from the backend.
+
+If Chert credentials are unavailable, implement and test everything possible with signed webhook fixtures, report the exact missing prerequisites, and stop. Do not manufacture a successful live test.
+
+## Time limit
+
+Target approximately 75 minutes, with a 90-minute cap.
+
+Prioritize the complete end-to-end interaction over optional features.
+
+Do not implement FaceTime, AI, or unrelated dashboard redesigns.
+
+## Final report
+
+Provide:
+- Files modified.
+- Chert API and webhook verification.
+- Actual live-message status.
+- Webhook signature and deduplication test results.
+- Dashboard update latency.
+- Tiger Data event persistence status.
+- Tests and build results.
+- Git commit and Entire checkpoint status.
+
+Commit and push Phase 6 separately once tested.
+
+Stop and await approval before Phase 5.
+</pasted_content id="a80e">
+
+---
+
+tell me whats left now
+
+---
+
+Continue Phase 6 with the remaining implementation and verification tasks exactly as outlined.
+
+Prioritize webhook security tests, the frontend race-condition fix, database migration, and the complete approve → send → reply → dashboard flow.
+
+Do not rush or skip testing to meet the original time estimate.
+
+Before finishing, specifically verify that:
+- A valid `IN` reply triggers exactly one staff confirmation.
+- A duplicate webhook never adds another staff member.
+- Invalid, stale, expired, or unauthorized replies do not affect the simulation.
+- A live confirmation arriving during another frontend interaction is eventually reflected correctly.
+- The baseline remains unchanged and the intervention follows the verified 45-minute staffing lead time.
+- The application remains usable in clearly labeled mock mode when Chert is not configured.
+
+Complete automated tests, frontend build, lint, migrations, documentation, and Git/Entire synchronization.
+
+Report the live Chert test as **PENDING** until a real opted-in iPhone successfully receives and replies to a message. Do not claim the integration is fully verified based only on mocked webhooks.
+
+Stop after Phase 6 and provide the final report.
+
+---
+
+<pasted_content id="a80e">
+**URGENT — TriageX Phase 6: Chert FaceTime Sponsor Prize**
+
+We are explicitly targeting the **Chert Best Use of FaceTime prize at EmoryHacks**.
+
+Official resources:
+- https://www.trychert.com/emory
+- https://app.trychert.com/skills.md
+
+Our existing Phase 6 iMessage implementation is partially complete. Preserve all existing code, tests, database migrations, and frontend work. Do not discard or rewrite anything unnecessarily.
+
+**Your immediate task is to investigate and report, NOT implement yet.**
+
+1. Read both official Chert resources and their linked API documentation.
+2. Identify exactly how to provision our free hackathon Chert line.
+3. Determine whether Chert supports outbound FaceTime calls, inbound FaceTime calls, live video frame access, audio interaction, and programmatic call control.
+4. Determine whether our Python/FastAPI backend can receive video frames directly or whether a separate agent runtime is required.
+5. Identify the authentication credentials, webhook configuration, and public HTTPS tunnel requirements.
+6. Determine how our teammate's opted-in iPhone can participate in the live demo.
+7. Assess whether this workflow is technically feasible:
+
+   TriageX detects a surge → Operator approves outreach → Agent FaceTimes teammate → Teammate shows a fictional staff availability card → AI reads and validates the card against a synthetic roster → Teammate explicitly confirms availability → Existing staffing-confirmation service updates the simulation → Two futures diverge.
+
+8. If visual card recognition is unsupported, propose the closest feasible FaceTime-native alternative that still demonstrates meaningful live video understanding.
+9. Estimate the minimum implementation time and identify the biggest technical risks.
+10. Explain how to preserve the existing iMessage functionality as a secondary channel or fallback.
+
+**Important constraints:**
+- Do not invent API capabilities or endpoints.
+- Do not fake FaceTime calls or video processing.
+- Do not expose credentials or secrets.
+- Do not start Phase 5 AI brief integration.
+- Do not commit unfinished experimental changes.
+
+**Your response must include:**
+- Verified Chert capabilities, with documentation references.
+- Exact onboarding steps I must perform.
+- Recommended FaceTime demonstration architecture.
+- Required environment variables.
+- Minimum viable implementation plan.
+- Clear distinction between confirmed functionality and assumptions.
+
+**STOP after the investigation and wait for my approval before coding.**
+</pasted_content id="a80e">
+
+---
+
+<pasted_content id="a80e">
+We are targeting the Chert Best Use of FaceTime sponsor prize at EmoryHacks.
+
+Follow the official Chert onboarding instructions at https://app.trychert.com/skills.md.
+
+Our existing project is TriageX. Preserve the FastAPI backend, React dashboard, Tiger Data integration, and existing Phase 6 iMessage work.
+
+Your immediate objectives:
+
+1. Check Node.js and the official Chert CLI requirements on my Windows laptop.
+2. Guide me through provisioning our free Chert hackathon line using the official onboarding process.
+3. Help me verify my teammate's opted-in iPhone.
+4. Establish one genuine FaceTime call between Chert and that iPhone.
+5. Check whether caller video capture is enabled and whether the agent can access real video frames.
+6. If caller vision requires manual activation, tell me exactly what to request from Chert's team.
+7. Keep all credentials in .env and never print or commit secrets.
+
+Do not implement the complete visual staffing agent yet. Do not start Phase 5.
+
+Stop after the FaceTime connectivity test and report the results.
+</pasted_content id="a80e">
+
+---
+
+<task-notification>
+<task-id>b5m9d7n7i</task-id>
+<tool-use-id>toolu_01KUUtkCcqsgEZVW6DCzMp1y</tool-use-id>
+<output-file>C:\Users\mustu\AppData\Local\Temp\claude\47afe91d824f6eb5\2aff9bc5-d6e7-4c3a-85e2-9c64d62c1aef\tasks\b5m9d7n7i.output</output-file>
+<status>failed</status>
+<summary>Monitor "Chert onboarding JSON records" script failed (exit 1)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bwi6lqrmh</task-id>
+<summary>Monitor event: "Chert onboarding progress records"</summary>
+<event>{"schema_version":1,"command":"onboard","code":"login_still_waiting","remaining_seconds":1766,"message":"Still waiting for sign-in and setup in your browser (this code: 30 min left). Keep this command running; Ctrl+C pauses.","step":"sign_in","action_url":"https://app.trychert.com/cli?onboard=96282f97-fa33-463d-a70a-524510760c79"}</event>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bwi6lqrmh</task-id>
+<summary>Monitor event: "Chert onboarding progress records"</summary>
+<event>{"schema_version":1,"command":"onboard","code":"login_still_waiting","remaining_seconds":1736,"message":"Still waiting for sign-in and setup in your browser (this code: 29 min left). Keep this command running; Ctrl+C pauses.","step":"sign_in","action_url":"https://app.trychert.com/cli?onboard=96282f97-fa33-463d-a70a-524510760c79"}</event>
+</task-notification>
+
+---
+
+so whats left right now
