@@ -1,0 +1,369 @@
+<pasted_content id="a80e">
+Phase 1 is approved.
+
+I have renamed the GitHub repository to TriageX, updated the Git remote, and enabled Entire. Please verify each of those before proceeding.
+
+Now:
+
+1. Run `git status` and verify no credentials, `.env` files, or virtual environments are staged.
+2. Re-run the backend and frontend tests.
+3. Stage and commit the Phase 1 implementation with the message `chore: initialize TriageX monorepo and development environment`.
+4. Verify the commit exists and inspect Entire's checkpoint/session tracking status.
+5. Report whether Entire successfully captured the Claude Code development session. Do not claim it did unless verified.
+6. Report the final Git status and commit hash.
+
+Do not begin Phase 2 yet. Wait for my approval.
+</pasted_content id="a80e">
+
+---
+
+it has been pushed
+
+---
+
+so do that
+
+---
+
+<pasted_content id="a80e">
+# TriageX — Approve Phase 2: Deterministic Simulation Engine
+
+Phase 1 is approved and complete. GitHub and Entire checkpoints are synced.
+
+You are now authorized to implement **Phase 2 only**, following `docs/plan.md`.
+
+## Objective
+
+Build a reproducible hospital surge simulation that supports our central demo:
+
+**One surge. Two futures.**
+
+The same synthetic patient arrivals and initial hospital conditions must produce two comparable tracks:
+
+- **Baseline:** Ordinary reactive hospital operations, including realistic diversion.
+- **With TriageX:** The same operations, plus explicitly approved and confirmed interventions.
+
+No artificial improvements, hardcoded outcomes, or hidden advantages.
+
+## Implementation requirements
+
+### 1. Hospital network
+
+Model the five Atlanta hospital locations already defined in our plan.
+
+Use synthetic staffing, treatment-space capacity, arrivals, and service times. Do not represent these values as actual hospital conditions.
+
+### 2. Simulation engine
+
+Implement the planned 15-minute tick engine, with a 24-hour simulation horizon and support for displaying a six-hour demo window.
+
+Use deterministic random generation and stable ordering.
+
+The engine must support identical replay from the same scenario, seed, and intervention list.
+
+### 3. Two simulation tracks
+
+Track A and Track B must be identical when no interventions exist.
+
+They must remain identical until a TriageX intervention actually becomes effective.
+
+### 4. Staffing intervention
+
+Use the Phase 0 plan's 45-minute simulated staffing lead time.
+
+A staff confirmation may increase staffed capacity only when physical treatment spaces are available.
+
+The intervention must not instantly reduce queues when the confirmation arrives.
+
+### 5. Surge scenarios
+
+Implement the four planned synthetic scenarios:
+
+- I-85 Multi-Vehicle Pileup
+- Big Game Downtown
+- Summer Heat Wave
+- Respiratory Wave
+
+Prioritize making the I-85 scenario credible and deterministic.
+
+### 6. Forecasting
+
+Implement the planned two-hour-ahead projection using only information available at the current simulated time.
+
+Forecasts must not inspect future patient arrivals.
+
+Keep forecasts separate from actual future outcomes.
+
+### 7. Computed metrics
+
+Calculate all results from simulation state and patient events.
+
+Include:
+
+- Hospital saturation
+- Queue lengths
+- Patient waiting times
+- Ambulance handoff waiting hours
+- Diversion events
+- Staff utilization
+- Intervention effectiveness
+
+Never hardcode percentage improvements.
+
+### 8. Demo-specific requirements
+
+The engine must support:
+
+- A shared timeline for both tracks.
+- A visible intervention approval time.
+- A 45-minute simulated lead-time window.
+- A shift-active marker.
+- Recalculation of Track B after a confirmation.
+- A six-hour view of the complete scenario.
+
+The eventual UI should be able to show two curves separating only after an intervention becomes effective.
+
+### 9. Testing
+
+Write meaningful automated tests covering:
+
+- Deterministic replay.
+- Baseline equality without interventions.
+- No effect before intervention activation.
+- Staffing constrained by physical capacity.
+- Correct ambulance handoff calculations.
+- Forecast isolation from future arrivals.
+- Consistent results across scenarios.
+
+Run pytest, Ruff, and any other applicable checks.
+
+## Important constraints
+
+- Do not begin Phase 3.
+- Do not modify frontend architecture.
+- Do not integrate Chert, Tiger Data, OpenAI, or Gemini yet.
+- Do not change the existing approved project structure without explaining why.
+- Preserve Entire tracking.
+- Keep the simulation independent of external APIs.
+- Do not manufacture favorable results.
+
+## Final report
+
+When finished, provide:
+
+1. Files created or modified.
+2. Simulation architecture.
+3. Example I-85 scenario output with actual computed metrics.
+4. Test results.
+5. Performance measurements.
+6. Known limitations.
+7. Whether the planned live demo is supported.
+8. Git commit hash and Entire checkpoint status.
+
+Commit Phase 2 as a separate Git checkpoint, push it, and verify that Entire synced successfully.
+
+**Stop after Phase 2 and wait for approval before proceeding.**
+</pasted_content id="a80e">
+
+---
+
+<pasted_content id="a80e">
+## Hackathon Demo and Pitch Priority — Critical
+
+TriageX is being built for a live hackathon presentation. Our primary goal is to demonstrate a compelling, visually clear, end-to-end hospital surge coordination system.
+
+Every backend decision should support the following experience:
+
+**Surge predicted → Human approves outreach → Staff confirms → Intervention becomes active → Two simulated futures visibly diverge → Measurable impact appears.**
+
+Design the API responses so the frontend can deliver this entire experience on a single screen without unnecessary navigation or waiting.
+
+Specifically:
+
+1. **Cinematic demo progression:** Return the data needed for a smooth timeline replay, including hospital status transitions, forecast alerts, approval events, confirmation events, staffing lead-time bands, shift-start markers, and comparison curves.
+
+2. **Strong visual storytelling:** Make it straightforward for the frontend to animate the transition from identical baseline and intervention curves to visibly different outcomes after the intervention becomes active.
+
+3. **Hero metrics:** Prioritize ambulance handoff hours, patient waiting time, and hospital recovery. Return computed absolute differences and percentage changes so the frontend doesn't need to calculate them.
+
+4. **Instant interaction:** Aim for the confirmed staffing response to trigger an updated comparison in under 200 ms locally. Measure the actual latency rather than assuming it.
+
+5. **Six-hour demo window:** Provide a ready-to-render six-hour timeline for the I-85 scenario, while preserving the underlying 24-hour simulation.
+
+6. **Single-screen presentation:** Design response schemas for a dashboard containing an Atlanta hospital map, synchronized comparison charts, a live coordination feed, and one prominent impact metric.
+
+7. **Reliable demo reset:** Support returning the application to the same initial scenario and timeline so we can rehearse the presentation repeatedly.
+
+8. **Presentation-friendly event labels:** Provide concise event titles such as "Surge Predicted," "Outreach Approved," "Staff Confirmed," and "Shift Active."
+
+9. **Authentic results:** All metrics must come from the simulation. Never fabricate improvements, modify historical results, or make the intervention appear effective before its simulated activation time.
+
+10. **Keep technical limitations out of the main demo narrative:** Present the strongest verified capabilities and computed results prominently. Keep engineering diagnostics available for development and judge Q&A, rather than cluttering the presentation screen.
+
+The desired result is not simply a functioning API. It is an API specifically designed to power a memorable, polished, 90-second live demonstration.
+
+Do not implement the frontend during Phase 3. Just make sure the API supports this experience.
+</pasted_content id="a80e">
+
+---
+
+<pasted_content id="a80e">
+Phase 3 implementation is approved, pending a final timeline consistency check.
+
+Before committing, verify one detail:
+
+Phase 2 reported the I-85 proposal at 16:15, operator approval at 16:30, and shift activation at 17:15.
+
+Phase 3 reports the proposal at 16:15 and shift activation at 17:00.
+
+Please determine whether this is an intentional change or whether proposal creation time is incorrectly being used as approval time.
+
+The 45-minute lead time must start from the actual operator approval timestamp, not the proposal timestamp. Ensure the API, event feed, timeline bands, simulation engine, and tests agree.
+
+Also verify that:
+- Each simulated confirmation recomputes Track B without changing the baseline.
+- The displayed impact metrics are calculated from the same comparison data returned to the frontend.
+- A simulated reply is never presented as a real Chert message.
+- The 25–30 ms measurement represents the actual API round trip, not just engine execution.
+
+If the timeline needs correction, fix it and rerun the relevant tests.
+
+Then:
+
+1. Run all backend tests, Ruff checks, frontend tests, and frontend build.
+2. Commit Phase 3 separately with message `feat: add TriageX live simulation API`.
+3. Push to GitHub.
+4. Verify the Entire checkpoint is synced.
+5. Report the commit hash, checkpoint status, final test results, and confirmed approval/activation timeline.
+
+Do not begin Phase 4 yet. Wait for my approval.
+</pasted_content id="a80e">
+
+---
+
+<pasted_content id="a80e">
+# TriageX — Approve Phase 4: Tiger Data Persistence
+
+Phase 3 is approved and complete.
+
+The simulation API, corrected intervention timeline, automated tests, Git commits and Entire checkpoints are verified according to the Phase 3 report.
+
+You are authorized to implement **Phase 4 only**, following `docs/plan.md`.
+
+## Primary objective
+
+Integrate Tiger Data PostgreSQL/TimescaleDB into TriageX to persist simulation runs, hospital metrics, staffing coordination events, and intervention outcomes.
+
+The database should strengthen our technical architecture and provide real evidence for sponsor judging without slowing down the 90-second live demo.
+
+## Implementation priorities
+
+### 1. Database connection
+
+- Use Tiger Data PostgreSQL with environment-based credentials.
+- Never commit connection strings, passwords or API keys.
+- Use a small, reliable connection pool.
+- Provide a database health check that reflects actual connectivity.
+- Preserve existing `not_implemented` status until connectivity is verified.
+
+### 2. Database schema
+
+Implement the schema from `docs/plan.md`, including the relevant entities:
+
+- Hospitals
+- Scenarios
+- Simulation runs
+- Hospital time-series metrics
+- Staffing requests
+- Staff confirmations
+- Outreach events
+- Intervention events
+- Agent activity
+
+Use TimescaleDB hypertables where supported and appropriate for hospital time-series data.
+
+Do not create unnecessary tables merely to match the plan if they serve no implemented Phase 4 functionality; document any deferrals.
+
+### 3. Persistence behavior
+
+- Persist simulation run metadata and seed.
+- Persist hospital-level metrics across the simulation timeline.
+- Persist approval, confirmation and activation events.
+- Persist computed comparison metrics.
+- Preserve the distinction between baseline and TriageX tracks.
+- Make writes idempotent where possible.
+- Ensure a failed database write cannot silently corrupt the in-memory simulation state.
+
+### 4. Demo performance
+
+The current live API responds to confirmations in approximately 25–30 ms.
+
+Preserve fast dashboard updates.
+
+Do not require the frontend to wait for a full database write before displaying a recalculated comparison.
+
+If using asynchronous persistence, make failures visible in diagnostics and verify that queued writes are eventually stored.
+
+### 5. Sponsor demonstration
+
+Provide at least one meaningful Tiger Data query that demonstrates actual stored simulation data.
+
+For example:
+
+- Hospital saturation over time.
+- Baseline versus TriageX capacity.
+- Intervention events correlated with recovery.
+- Ambulance handoff metrics across a simulation run.
+
+The output must be based on actual persisted rows, not hardcoded examples.
+
+### 6. Reliability
+
+- Preserve the deterministic simulation engine.
+- Do not modify calibrated scenario assumptions.
+- Avoid breaking the existing Phase 3 API contracts.
+- Provide a clean database initialization or migration command.
+- Handle database unavailability gracefully.
+- Support local development without Tiger Data credentials.
+
+### 7. Testing
+
+Add tests for:
+
+- Database connection health.
+- Schema migrations.
+- Simulation persistence.
+- Event persistence.
+- Baseline/intervention separation.
+- Idempotent writes.
+- Database failure behavior.
+- Stored metrics matching the engine.
+
+Preserve all 109 existing backend tests.
+
+### 8. Scope constraints
+
+Do not implement Chert, OpenAI, Gemini or frontend dashboard components.
+
+Do not begin Phase 5 or Phase 6.
+
+Keep the work focused and avoid unnecessary infrastructure.
+
+## Final acceptance report
+
+Provide:
+
+1. Files created or modified.
+2. Database schema and migrations.
+3. Connection status: verified live Tiger Data or local-only.
+4. Actual rows written and queried.
+5. Example SQL queries and results.
+6. API performance after persistence.
+7. Tests and lint results.
+8. Known technical limitations and any deferred work.
+9. Git commit hash and Entire checkpoint status.
+
+If Tiger Data credentials are unavailable, complete the implementation and local tests, clearly identify what requires live verification, and stop rather than inventing a successful connection.
+
+Once tested, commit Phase 4 separately, push it, verify Entire synchronization, and wait for approval before continuing.
+</pasted_content id="a80e">
