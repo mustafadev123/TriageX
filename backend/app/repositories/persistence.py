@@ -222,171 +222,296 @@ def build_snapshot(run: Run, state: DashboardState, reason: str) -> RunSnapshot:
 # --- writing -------------------------------------------------------------------------------
 
 
-def _insert_series(con, snap: RunSnapshot, s: SeriesSnapshot) -> int:
-    cols: dict[str, list] = {k: [] for k in (
-        "ts", "hospital_id", "tick", "status", "saturation_pct", "occupied", "queue_length",
-        "ambulances_waiting", "staff_on_duty", "staffed_capacity", "mean_wait_minutes",
-        "forecast_saturation_pct", "diverting", "diverted_out", "transfers_out")}  # fmt: skip
-    for row in (r for tick in s.result.ticks for r in tick):
-        cols["ts"].append(tick_time(snap.scenario, row.tick).isoformat())
-        cols["hospital_id"].append(row.hospital_id)
-        cols["tick"].append(row.tick)
-        cols["status"].append(row.status.value)
-        cols["saturation_pct"].append(float(row.saturation_pct))
-        cols["occupied"].append(row.occupied)
-        cols["queue_length"].append(row.queue_length)
-        cols["ambulances_waiting"].append(row.ambulance_queue_length)
-        cols["staff_on_duty"].append(row.staff_on_duty)
-        cols["staffed_capacity"].append(row.staffed_capacity)
-        cols["mean_wait_minutes"].append(float(row.mean_current_wait_minutes))
-        cols["forecast_saturation_pct"].append(float(row.forecast_saturation_pct))
-        cols["diverting"].append(row.diverting)
-        cols["diverted_out"].append(row.diverted_out)
-        cols["transfers_out"].append(row.transfers_out)
-    rows = con.run(
-        """
-        INSERT INTO hospital_metrics (ts, run_id, track, series_version, hospital_id, tick,
-            status, saturation_pct, occupied, queue_length, ambulances_waiting, staff_on_duty,
-            staffed_capacity, mean_wait_minutes, forecast_saturation_pct, diverting,
-            diverted_out, transfers_out)
-        SELECT u.ts::timestamptz, :run_id, :track, :series_version, u.hospital_id, u.tick,
-            u.status, u.saturation_pct, u.occupied, u.queue_length, u.ambulances_waiting,
-            u.staff_on_duty, u.staffed_capacity, u.mean_wait_minutes, u.forecast_saturation_pct,
-            u.diverting, u.diverted_out, u.transfers_out
-        FROM unnest(CAST(:ts AS text[]), CAST(:hospital_id AS text[]), CAST(:tick AS int[]),
-                    CAST(:status AS text[]), CAST(:saturation_pct AS float8[]),
-                    CAST(:occupied AS int[]), CAST(:queue_length AS int[]),
-                    CAST(:ambulances_waiting AS int[]), CAST(:staff_on_duty AS int[]),
-                    CAST(:staffed_capacity AS int[]), CAST(:mean_wait_minutes AS float8[]),
-                    CAST(:forecast_saturation_pct AS float8[]), CAST(:diverting AS bool[]),
-                    CAST(:diverted_out AS int[]), CAST(:transfers_out AS int[]))
-            AS u(ts, hospital_id, tick, status, saturation_pct, occupied, queue_length,
-                 ambulances_waiting, staff_on_duty, staffed_capacity, mean_wait_minutes,
-                 forecast_saturation_pct, diverting, diverted_out, transfers_out)
-        ON CONFLICT DO NOTHING
-        RETURNING 1
-        """,
-        run_id=snap.run_id,
-        track=s.track,
-        series_version=s.series_version,
-        **cols,
+# Each snapshot is written with two statements in one transaction (plus BEGIN/COMMIT), so
+# the cost is a handful of network round trips regardless of how many rows it carries.
+# Against Tiger Data (~230 ms per round trip from the demo laptop) one statement per row
+# took ~20 s per snapshot.
+
+_CORE_SQL = """
+WITH
+h AS (
+    INSERT INTO hospitals (hospital_id, name, short_name, lat, lon, treatment_spaces,
+                           base_staff, patients_per_staff)
+    SELECT * FROM unnest(CAST(:h_id AS text[]), CAST(:h_name AS text[]),
+                         CAST(:h_short AS text[]), CAST(:h_lat AS float8[]),
+                         CAST(:h_lon AS float8[]), CAST(:h_spaces AS int[]),
+                         CAST(:h_staff AS int[]), CAST(:h_pps AS float8[]))
+    ON CONFLICT (hospital_id) DO UPDATE SET name = EXCLUDED.name,
+        short_name = EXCLUDED.short_name, lat = EXCLUDED.lat, lon = EXCLUDED.lon,
+        treatment_spaces = EXCLUDED.treatment_spaces, base_staff = EXCLUDED.base_staff,
+        patients_per_staff = EXCLUDED.patients_per_staff
+    RETURNING 1
+),
+s AS (
+    INSERT INTO scenarios (scenario_id, name, description, start_clock_minutes,
+        surge_onset_tick, demo_window_start_tick, demo_window_ticks, horizon_ticks,
+        focus_hospital_id, assumptions, definition_sha256)
+    VALUES (:sc_id, :sc_name, :sc_description, :sc_start, :sc_onset, :sc_ws, :sc_wt,
+            :sc_horizon, :sc_focus, CAST(:sc_assumptions AS jsonb), :sc_sha)
+    ON CONFLICT (scenario_id) DO UPDATE SET name = EXCLUDED.name,
+        description = EXCLUDED.description, assumptions = EXCLUDED.assumptions,
+        definition_sha256 = EXCLUDED.definition_sha256
+    RETURNING 1
+),
+r AS (
+    INSERT INTO simulation_runs (run_id, scenario_id, seed, created_at, sim_start,
+        tick_minutes, patients_sampled, baseline_digest, engine_version)
+    VALUES (:run_id, :sc_id, :seed, CAST(:created_at AS timestamptz),
+            CAST(:sim_start AS timestamptz), :tick_minutes, :patients, :baseline_digest,
+            :engine)
+    ON CONFLICT (run_id) DO NOTHING
+    RETURNING 1
+),
+v AS (
+    INSERT INTO run_versions (run_id, version, reason, recorded_at, triagex_series_version,
+        triagex_digest, confirmed_staff, recompute_ms)
+    VALUES (:run_id, :version, :reason, CAST(:recorded_at AS timestamptz), :series_version,
+            :triagex_digest, :confirmed_staff, CAST(:recompute_ms AS float8))
+    ON CONFLICT (run_id, version) DO NOTHING
+    RETURNING 1
+),
+c AS (
+    INSERT INTO comparison_metrics (run_id, version, scope, metric, baseline, triagex, delta,
+                                    pct_change)
+    SELECT :run_id, :version, u.* FROM unnest(CAST(:c_scope AS text[]),
+        CAST(:c_metric AS text[]), CAST(:c_base AS float8[]), CAST(:c_tri AS float8[]),
+        CAST(:c_delta AS float8[]), CAST(:c_pct AS float8[])) AS u
+    ON CONFLICT DO NOTHING
+    RETURNING 1
+),
+q AS (
+    INSERT INTO staffing_requests (request_id, run_id, proposal_id, hospital_id,
+        requested_staff, proposal_tick, approved_tick, effective_tick, end_tick,
+        approved_at, expires_at, operator)
+    SELECT u.request_id, :run_id, u.proposal_id, u.hospital_id, u.requested_staff,
+           u.proposal_tick, u.approved_tick, u.effective_tick, u.end_tick,
+           u.approved_at::timestamptz, u.expires_at::timestamptz, u.operator
+    FROM unnest(CAST(:q_id AS text[]), CAST(:q_proposal AS text[]),
+                CAST(:q_hospital AS text[]), CAST(:q_requested AS int[]),
+                CAST(:q_proposal_tick AS int[]), CAST(:q_approved_tick AS int[]),
+                CAST(:q_effective_tick AS int[]), CAST(:q_end_tick AS int[]),
+                CAST(:q_approved_at AS text[]), CAST(:q_expires_at AS text[]),
+                CAST(:q_operator AS text[]))
+        AS u(request_id, proposal_id, hospital_id, requested_staff, proposal_tick,
+             approved_tick, effective_tick, end_tick, approved_at, expires_at, operator)
+    ON CONFLICT (request_id) DO NOTHING
+    RETURNING 1
+),
+f AS (
+    INSERT INTO staff_confirmations (request_id, staff_id, display_name, source,
+                                     received_at, recompute_ms)
+    SELECT u.request_id, u.staff_id, u.display_name, u.source, u.received_at::timestamptz,
+           u.recompute_ms
+    FROM unnest(CAST(:f_request AS text[]), CAST(:f_staff AS text[]),
+                CAST(:f_name AS text[]), CAST(:f_source AS text[]),
+                CAST(:f_received AS text[]), CAST(:f_ms AS float8[]))
+        AS u(request_id, staff_id, display_name, source, received_at, recompute_ms)
+    ON CONFLICT (request_id, staff_id) DO NOTHING
+    RETURNING 1
+),
+e AS (
+    INSERT INTO intervention_events (run_id, intervention_id, kind, hospital_id, tick,
+                                     sim_time, wall_time, detail)
+    SELECT :run_id, u.iid, u.kind, u.hid, u.tick, u.sim_time::timestamptz,
+           u.wall_time::timestamptz, u.detail::jsonb
+    FROM unnest(CAST(:e_iid AS text[]), CAST(:e_kind AS text[]), CAST(:e_hid AS text[]),
+                CAST(:e_tick AS int[]), CAST(:e_sim AS text[]), CAST(:e_wall AS text[]),
+                CAST(:e_detail AS text[]))
+        AS u(iid, kind, hid, tick, sim_time, wall_time, detail)
+    ON CONFLICT (run_id, intervention_id, kind) DO UPDATE SET detail = EXCLUDED.detail
+    RETURNING 1
+),
+d AS (
+    DELETE FROM agent_activity WHERE run_id = :run_id AND seq >= :activity_count
+    RETURNING 1
+),
+a AS (
+    INSERT INTO agent_activity (run_id, seq, event_id, tick, sim_time, title, detail, kind,
+                                track, origin, severity, hospital_id, wall_time)
+    SELECT :run_id, u.seq, u.event_id, u.tick, u.sim_time::timestamptz, u.title, u.detail,
+           u.kind, u.track, u.origin, u.severity, u.hospital_id, u.wall_time::timestamptz
+    FROM unnest(CAST(:a_seq AS int[]), CAST(:a_event AS text[]), CAST(:a_tick AS int[]),
+                CAST(:a_sim AS text[]), CAST(:a_title AS text[]), CAST(:a_detail AS text[]),
+                CAST(:a_kind AS text[]), CAST(:a_track AS text[]), CAST(:a_origin AS text[]),
+                CAST(:a_severity AS text[]), CAST(:a_hospital AS text[]),
+                CAST(:a_wall AS text[]))
+        AS u(seq, event_id, tick, sim_time, title, detail, kind, track, origin, severity,
+             hospital_id, wall_time)
+    ON CONFLICT (run_id, seq) DO UPDATE SET event_id = EXCLUDED.event_id,
+        tick = EXCLUDED.tick, sim_time = EXCLUDED.sim_time, title = EXCLUDED.title,
+        detail = EXCLUDED.detail, kind = EXCLUDED.kind, track = EXCLUDED.track,
+        origin = EXCLUDED.origin, severity = EXCLUDED.severity,
+        hospital_id = EXCLUDED.hospital_id, wall_time = EXCLUDED.wall_time
+    RETURNING 1
+)
+SELECT (SELECT count(*) FROM r) + (SELECT count(*) FROM v) + (SELECT count(*) FROM c)
+     + (SELECT count(*) FROM q) + (SELECT count(*) FROM f) + (SELECT count(*) FROM e)
+     + (SELECT count(*) FROM a)
+     + 0 * ((SELECT count(*) FROM h) + (SELECT count(*) FROM s) + (SELECT count(*) FROM d))
+"""
+
+_METRICS_SQL = """
+INSERT INTO hospital_metrics (ts, run_id, track, series_version, hospital_id, tick, status,
+    saturation_pct, occupied, queue_length, ambulances_waiting, staff_on_duty,
+    staffed_capacity, mean_wait_minutes, forecast_saturation_pct, diverting, diverted_out,
+    transfers_out)
+SELECT u.ts::timestamptz, :run_id, u.track, u.series_version, u.hospital_id, u.tick, u.status,
+       u.saturation_pct, u.occupied, u.queue_length, u.ambulances_waiting, u.staff_on_duty,
+       u.staffed_capacity, u.mean_wait_minutes, u.forecast_saturation_pct, u.diverting,
+       u.diverted_out, u.transfers_out
+FROM unnest(CAST(:ts AS text[]), CAST(:track AS text[]), CAST(:series_version AS int[]),
+            CAST(:hospital_id AS text[]), CAST(:tick AS int[]), CAST(:status AS text[]),
+            CAST(:saturation_pct AS float8[]), CAST(:occupied AS int[]),
+            CAST(:queue_length AS int[]), CAST(:ambulances_waiting AS int[]),
+            CAST(:staff_on_duty AS int[]), CAST(:staffed_capacity AS int[]),
+            CAST(:mean_wait_minutes AS float8[]), CAST(:forecast_saturation_pct AS float8[]),
+            CAST(:diverting AS bool[]), CAST(:diverted_out AS int[]),
+            CAST(:transfers_out AS int[]))
+    AS u(ts, track, series_version, hospital_id, tick, status, saturation_pct, occupied,
+         queue_length, ambulances_waiting, staff_on_duty, staffed_capacity, mean_wait_minutes,
+         forecast_saturation_pct, diverting, diverted_out, transfers_out)
+ON CONFLICT DO NOTHING
+RETURNING 1
+"""
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _metric_columns(snap: RunSnapshot) -> dict[str, list]:
+    keys = (
+        "ts", "track", "series_version", "hospital_id", "tick", "status", "saturation_pct",
+        "occupied", "queue_length", "ambulances_waiting", "staff_on_duty", "staffed_capacity",
+        "mean_wait_minutes", "forecast_saturation_pct", "diverting", "diverted_out",
+        "transfers_out",
+    )  # fmt: skip
+    cols: dict[str, list] = {k: [] for k in keys}
+    for s in snap.series:
+        for row in (r for tick in s.result.ticks for r in tick):
+            cols["ts"].append(tick_time(snap.scenario, row.tick).isoformat())
+            cols["track"].append(s.track)
+            cols["series_version"].append(s.series_version)
+            cols["hospital_id"].append(row.hospital_id)
+            cols["tick"].append(row.tick)
+            cols["status"].append(row.status.value)
+            cols["saturation_pct"].append(float(row.saturation_pct))
+            cols["occupied"].append(row.occupied)
+            cols["queue_length"].append(row.queue_length)
+            cols["ambulances_waiting"].append(row.ambulance_queue_length)
+            cols["staff_on_duty"].append(row.staff_on_duty)
+            cols["staffed_capacity"].append(row.staffed_capacity)
+            cols["mean_wait_minutes"].append(float(row.mean_current_wait_minutes))
+            cols["forecast_saturation_pct"].append(float(row.forecast_saturation_pct))
+            cols["diverting"].append(row.diverting)
+            cols["diverted_out"].append(row.diverted_out)
+            cols["transfers_out"].append(row.transfers_out)
+    return cols
+
+
+def _core_params(snap: RunSnapshot) -> dict:
+    sc, hs = snap.scenario, snap.network.hospitals
+    definition = json.dumps(
+        {
+            "bursts": [repr(b) for b in sc.bursts],
+            "windows": [repr(w) for w in sc.demand_windows],
+            "service_multiplier": sc.service_multiplier,
+            "ambulance_delta": sc.ambulance_fraction_delta,
+            "walk_in_mix": sc.walk_in_acuity_mix,
+        },
+        sort_keys=True,
     )
-    return len(rows)
+    cmp = snap.comparison_rows
+    reqs = snap.staffing_requests
+    confs = snap.confirmations
+    events = snap.intervention_events
+    acts = snap.activity
+    return {
+        "h_id": [h.id for h in hs],
+        "h_name": [h.name for h in hs],
+        "h_short": [h.short_name for h in hs],
+        "h_lat": [h.lat for h in hs],
+        "h_lon": [h.lon for h in hs],
+        "h_spaces": [h.treatment_spaces for h in hs],
+        "h_staff": [h.base_staff for h in hs],
+        "h_pps": [float(h.patients_per_staff) for h in hs],
+        "sc_id": sc.id,
+        "sc_name": sc.name,
+        "sc_description": sc.description,
+        "sc_start": sc.start_clock_minutes,
+        "sc_onset": sc.surge_onset_tick,
+        "sc_ws": sc.demo_window_start_tick,
+        "sc_wt": sc.demo_window_ticks,
+        "sc_horizon": sc.horizon_ticks,
+        "sc_focus": sc.focus_hospital_id,
+        "sc_assumptions": json.dumps(list(sc.assumptions)),
+        "sc_sha": hashlib.sha256(definition.encode()).hexdigest(),
+        "run_id": snap.run_id,
+        "seed": snap.seed,
+        "created_at": _iso(snap.created_at),
+        "sim_start": _iso(sim_start(sc)),
+        "tick_minutes": TICK_MINUTES,
+        "patients": snap.patients_sampled,
+        "baseline_digest": series_digest(snap.baseline),
+        "engine": ENGINE_VERSION,
+        "version": snap.version,
+        "reason": snap.reason,
+        "recorded_at": _iso(snap.recorded_at),
+        "series_version": snap.triagex_series_version,
+        "triagex_digest": series_digest(snap.triagex),
+        "confirmed_staff": snap.confirmed_staff,
+        "recompute_ms": snap.recompute_ms,
+        "c_scope": [r[0] for r in cmp],
+        "c_metric": [r[1] for r in cmp],
+        "c_base": [float(r[2]) for r in cmp],
+        "c_tri": [float(r[3]) for r in cmp],
+        "c_delta": [float(r[4]) for r in cmp],
+        "c_pct": [None if r[5] is None else float(r[5]) for r in cmp],
+        "q_id": [r["request_id"] for r in reqs],
+        "q_proposal": [r["proposal_id"] for r in reqs],
+        "q_hospital": [r["hospital_id"] for r in reqs],
+        "q_requested": [r["requested_staff"] for r in reqs],
+        "q_proposal_tick": [r["proposal_tick"] for r in reqs],
+        "q_approved_tick": [r["approved_tick"] for r in reqs],
+        "q_effective_tick": [r["effective_tick"] for r in reqs],
+        "q_end_tick": [r["end_tick"] for r in reqs],
+        "q_approved_at": [_iso(r["approved_at"]) for r in reqs],
+        "q_expires_at": [_iso(r["expires_at"]) for r in reqs],
+        "q_operator": [r["operator"] for r in reqs],
+        "f_request": [c["request_id"] for c in confs],
+        "f_staff": [c["staff_id"] for c in confs],
+        "f_name": [c["display_name"] for c in confs],
+        "f_source": [c["source"] for c in confs],
+        "f_received": [_iso(c["received_at"]) for c in confs],
+        "f_ms": [float(c["recompute_ms"]) for c in confs],
+        "e_iid": [e["intervention_id"] for e in events],
+        "e_kind": [e["kind"] for e in events],
+        "e_hid": [e["hospital_id"] for e in events],
+        "e_tick": [e["tick"] for e in events],
+        "e_sim": [tick_time(sc, e["tick"]).isoformat() for e in events],
+        "e_wall": [_iso(e["wall_time"]) for e in events],
+        "e_detail": [json.dumps(e["detail"], sort_keys=True) for e in events],
+        "activity_count": len(acts),
+        "a_seq": [a["seq"] for a in acts],
+        "a_event": [a["event_id"] for a in acts],
+        "a_tick": [a["tick"] for a in acts],
+        "a_sim": [tick_time(sc, a["tick"]).isoformat() for a in acts],
+        "a_title": [a["title"] for a in acts],
+        "a_detail": [a["detail"] for a in acts],
+        "a_kind": [a["kind"] for a in acts],
+        "a_track": [a["track"] for a in acts],
+        "a_origin": [a["origin"] for a in acts],
+        "a_severity": [a["severity"] for a in acts],
+        "a_hospital": [a["hospital_id"] for a in acts],
+        "a_wall": [_iso(a["wall_time"]) for a in acts],
+    }
 
 
 def write_snapshot(con, snap: RunSnapshot) -> int:
-    """Write one snapshot inside the caller's transaction. Returns rows inserted."""
-    sc, written = snap.scenario, 0
-    for h in snap.network.hospitals:
-        con.run(
-            """INSERT INTO hospitals (hospital_id, name, short_name, lat, lon, treatment_spaces,
-                   base_staff, patients_per_staff)
-               VALUES (:id, :name, :short, :lat, :lon, :spaces, :staff, :pps)
-               ON CONFLICT (hospital_id) DO UPDATE SET name = EXCLUDED.name,
-                   short_name = EXCLUDED.short_name, lat = EXCLUDED.lat, lon = EXCLUDED.lon,
-                   treatment_spaces = EXCLUDED.treatment_spaces, base_staff = EXCLUDED.base_staff,
-                   patients_per_staff = EXCLUDED.patients_per_staff""",
-            id=h.id, name=h.name, short=h.short_name, lat=h.lat, lon=h.lon,
-            spaces=h.treatment_spaces, staff=h.base_staff, pps=h.patients_per_staff,
-        )  # fmt: skip
-    definition = json.dumps(
-        {"bursts": [repr(b) for b in sc.bursts], "windows": [repr(w) for w in sc.demand_windows],
-         "service_multiplier": sc.service_multiplier,
-         "ambulance_delta": sc.ambulance_fraction_delta,
-         "walk_in_mix": sc.walk_in_acuity_mix}, sort_keys=True)  # fmt: skip
-    con.run(
-        """INSERT INTO scenarios (scenario_id, name, description, start_clock_minutes,
-               surge_onset_tick, demo_window_start_tick, demo_window_ticks, horizon_ticks,
-               focus_hospital_id, assumptions, definition_sha256)
-           VALUES (:id, :name, :description, :start, :onset, :ws, :wt, :horizon, :focus,
-                   CAST(:assumptions AS jsonb), :sha)
-           ON CONFLICT (scenario_id) DO UPDATE SET name = EXCLUDED.name,
-               description = EXCLUDED.description, assumptions = EXCLUDED.assumptions,
-               definition_sha256 = EXCLUDED.definition_sha256""",
-        id=sc.id, name=sc.name, description=sc.description, start=sc.start_clock_minutes,
-        onset=sc.surge_onset_tick, ws=sc.demo_window_start_tick, wt=sc.demo_window_ticks,
-        horizon=sc.horizon_ticks, focus=sc.focus_hospital_id,
-        assumptions=json.dumps(list(sc.assumptions)),
-        sha=hashlib.sha256(definition.encode()).hexdigest(),
-    )  # fmt: skip
-    written += len(con.run(
-        """INSERT INTO simulation_runs (run_id, scenario_id, seed, created_at, sim_start,
-               tick_minutes, patients_sampled, baseline_digest, engine_version)
-           VALUES (:run_id, :scenario_id, :seed, :created_at, :sim_start, :tick_minutes,
-                   :patients, :digest, :engine)
-           ON CONFLICT (run_id) DO NOTHING RETURNING 1""",
-        run_id=snap.run_id, scenario_id=sc.id, seed=snap.seed, created_at=snap.created_at,
-        sim_start=sim_start(sc), tick_minutes=TICK_MINUTES, patients=snap.patients_sampled,
-        digest=series_digest(snap.baseline), engine=ENGINE_VERSION,
-    ))  # fmt: skip
-    written += len(con.run(
-        """INSERT INTO run_versions (run_id, version, reason, recorded_at,
-               triagex_series_version, triagex_digest, confirmed_staff, recompute_ms)
-           VALUES (:run_id, :version, :reason, :recorded_at, :sv, :digest, :staff, :ms)
-           ON CONFLICT (run_id, version) DO NOTHING RETURNING 1""",
-        run_id=snap.run_id, version=snap.version, reason=snap.reason,
-        recorded_at=snap.recorded_at, sv=snap.triagex_series_version,
-        digest=series_digest(snap.triagex), staff=snap.confirmed_staff, ms=snap.recompute_ms,
-    ))  # fmt: skip
-    for s in snap.series:
-        written += _insert_series(con, snap, s)
-    for scope, metric, base, tri, delta, pct in snap.comparison_rows:
-        written += len(con.run(
-            """INSERT INTO comparison_metrics (run_id, version, scope, metric, baseline,
-                   triagex, delta, pct_change)
-               VALUES (:run_id, :version, :scope, :metric, :b, :t, :d, :p)
-               ON CONFLICT DO NOTHING RETURNING 1""",
-            run_id=snap.run_id, version=snap.version, scope=scope, metric=metric,
-            b=float(base), t=float(tri), d=float(delta),
-            p=None if pct is None else float(pct),
-        ))  # fmt: skip
-    for r in snap.staffing_requests:
-        written += len(
-            con.run(
-                """INSERT INTO staffing_requests (request_id, run_id, proposal_id, hospital_id,
-                   requested_staff, proposal_tick, approved_tick, effective_tick, end_tick,
-                   approved_at, expires_at, operator)
-               VALUES (:request_id, :run_id, :proposal_id, :hospital_id, :requested_staff,
-                   :proposal_tick, :approved_tick, :effective_tick, :end_tick, :approved_at,
-                   :expires_at, :operator)
-               ON CONFLICT (request_id) DO NOTHING RETURNING 1""",
-                **r,
-            )
-        )
-    for conf in snap.confirmations:
-        written += len(
-            con.run(
-                """INSERT INTO staff_confirmations (request_id, staff_id, display_name, source,
-                   received_at, recompute_ms)
-               VALUES (:request_id, :staff_id, :display_name, :source, :received_at,
-                   :recompute_ms)
-               ON CONFLICT (request_id, staff_id) DO NOTHING RETURNING 1""",
-                **conf,
-            )
-        )
-    for e in snap.intervention_events:
-        written += len(con.run(
-            """INSERT INTO intervention_events (run_id, intervention_id, kind, hospital_id,
-                   tick, sim_time, wall_time, detail)
-               VALUES (:run_id, :iid, :kind, :hid, :tick, :sim_time, :wall_time,
-                   CAST(:detail AS jsonb))
-               ON CONFLICT (run_id, intervention_id, kind) DO UPDATE
-                   SET detail = EXCLUDED.detail
-               RETURNING 1""",
-            run_id=snap.run_id, iid=e["intervention_id"], kind=e["kind"],
-            hid=e["hospital_id"], tick=e["tick"], sim_time=tick_time(sc, e["tick"]),
-            wall_time=e["wall_time"], detail=json.dumps(e["detail"], sort_keys=True),
-        ))  # fmt: skip
-    con.run("DELETE FROM agent_activity WHERE run_id = :run_id", run_id=snap.run_id)
-    for a in snap.activity:
-        written += len(con.run(
-            """INSERT INTO agent_activity (run_id, seq, event_id, tick, sim_time, title, detail,
-                   kind, track, origin, severity, hospital_id, wall_time)
-               VALUES (:run_id, :seq, :event_id, :tick, :sim_time, :title, :detail, :kind,
-                   :track, :origin, :severity, :hospital_id, :wall_time)
-               RETURNING 1""",
-            run_id=snap.run_id, sim_time=tick_time(sc, a["tick"]), **a,
-        ))  # fmt: skip
+    """Write one snapshot inside the caller's transaction. Returns rows inserted/upserted."""
+    written = int(con.run(_CORE_SQL, **_core_params(snap))[0][0])
+    if snap.series:
+        written += len(con.run(_METRICS_SQL, run_id=snap.run_id, **_metric_columns(snap)))
     return written
 
 

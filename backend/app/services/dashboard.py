@@ -206,6 +206,7 @@ def _impact(run: Run, curves: Curves) -> Impact:
         "ambulance hours",
         _delta(last.baseline_ambulance_hours_cumulative, last.triagex_ambulance_hours_cumulative),
         ("fewer ambulance hours lost", "more ambulance hours lost"),
+        decimals=2,  # always a multiple of 0.25; avoids half-even rounding (9.25 -> "9.2")
         intervention_scheduled=has_effect,
     )
     secondary = [
@@ -378,6 +379,13 @@ def _feed(run: Run, divergence: int | None) -> list[FeedEvent]:
             kind="surge_predicted", track="triagex", origin="simulation",
             severity="critical" if p.forecast_saturation_pct >= 100 else "warning",
             hospital_id=p.hospital_id)  # fmt: skip
+    recommended = run.recommended_proposal()
+    if recommended is not None:
+        add(1, tick=recommended.tick, title="Outreach Proposed",
+            detail=_proposal_title(run, recommended.kind, recommended.hospital_id,
+                                   recommended.recommended_staff),
+            kind="outreach_proposed", track="triagex", origin="simulation", severity="warning",
+            hospital_id=recommended.hospital_id)  # fmt: skip
     for a in run.actions:
         name = net.get(a.hospital_id).short_name
         if a.kind == "outreach_approved":
@@ -422,6 +430,13 @@ def _feed(run: Run, divergence: int | None) -> list[FeedEvent]:
                 detail=f"With TriageX future recalculated in {conf.recompute_ms:.0f} ms",
                 kind="recalculated", track="triagex", origin="simulation", severity="info",
                 hospital_id=r.hospital_id, wall_time=conf.received_at)  # fmt: skip
+        if r.confirmed_staff:
+            iv = r.intervention()
+            add(3, tick=r.approved_tick, title="Staff En Route",
+                detail=(f"{r.confirmed_staff} confirmed staff heading to {name}; "
+                        f"shift starts {label(iv.effective_tick)}"),
+                kind="staff_en_route", track="triagex", origin="simulation", severity="info",
+                hospital_id=r.hospital_id)  # fmt: skip
     # Diversion events identical in both futures are shown once, as "both".
     diversion_keys = {
         name: {(e.tick, e.kind, e.hospital_id) for e in track.events

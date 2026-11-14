@@ -1,17 +1,142 @@
 @import 'tailwindcss';
 
+/* TriageX command-center palette. Teal = TriageX, orange = baseline (no coordination). */
 @theme {
-  --color-surface: #0b1220;
-  --color-panel: #111a2e;
-  --color-border: #22304d;
-  --color-status-normal: #34d399;
-  --color-status-pressure: #fbbf24;
-  --color-status-breach: #f87171;
+  --color-ink: #050a14;
+  --color-surface: #070d1a;
+  --color-panel: #0c1526;
+  --color-panel-2: #101c33;
+  --color-line: #1c2a45;
+  --color-line-soft: #15213a;
+  --color-text: #e8eef8;
+  --color-muted: #8ea0bf;
+  --color-faint: #5b6d8e;
+
+  --color-triagex: #2dd4bf;
+  --color-triagex-strong: #5eead4;
+  --color-baseline: #fb923c;
+  --color-shared: #cbd5e1;
+
+  --color-st-normal: #34d399;
+  --color-st-approaching: #fbbf24;
+  --color-st-overloaded: #f43f5e;
+  --color-st-diverting: #e879f9;
+  --color-st-recovering: #38bdf8;
+
+  --font-sans: 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
   margin: 0;
-  background: var(--color-surface);
-  color: #e5ecf7;
-  font-family: Inter, system-ui, 'Segoe UI', sans-serif;
+  background: radial-gradient(1200px 600px at 50% -10%, #0e1b33 0%, var(--color-surface) 55%) fixed,
+    var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  background: linear-gradient(180deg, rgb(16 28 51 / 0.72), rgb(12 21 38 / 0.92));
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+.pulse-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+.flow-line {
+  stroke-dasharray: 6 6;
+  animation: flow-dash 0.9s linear infinite;
+}
+
+@keyframes feed-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.feed-in {
+  animation: feed-in 0.35s ease-out both;
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(45 212 191 / 0);
+  }
+  50% {
+    box-shadow: 0 0 28px 2px rgb(45 212 191 / 0.45);
+  }
+}
+.glow-teal {
+  animation: glow 1.8s ease-in-out infinite;
+}
+
+@keyframes attention {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(251 191 36 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(251 191 36 / 0.35);
+  }
+}
+.attention {
+  animation: attention 0.9s ease-in-out 3;
+}
+
+input[type='range'].scrubber {
+  accent-color: var(--color-triagex);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring,
+  .flow-line,
+  .glow-teal,
+  .attention,
+  .feed-in {
+    animation: none;
+  }
 }

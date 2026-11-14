@@ -9,6 +9,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.db import router as db_router
 from app.api.health import router as health_router
+from app.api.meta import router as meta_router
 from app.api.reference import router as reference_router
 from app.api.runs import router as runs_router
 from app.api.ws import ConnectionManager
@@ -68,6 +69,7 @@ def create_app(
     app.include_router(reference_router, prefix="/api")
     app.include_router(runs_router, prefix="/api")
     app.include_router(db_router, prefix="/api")
+    app.include_router(meta_router, prefix="/api")
     app.include_router(ws_router)
     return app
 

@@ -397,3 +397,24 @@ def test_websocket_pushes_run_updates(client):
         }
         ws.send_json({"type": "ping"})
         assert ws.receive_json() == {"type": "pong"}
+
+
+def test_feed_includes_proposed_and_en_route_steps(client):
+    s = _reset(client)
+    proposed = [e for e in s["feed"] if e["title"] == "Outreach Proposed"]
+    assert len(proposed) == 1 and proposed[0]["clock"] == "16:15"
+    assert proposed[0]["detail"] == "Call in 3 staff at Grady"
+    assert not any(e["title"] == "Staff En Route" for e in s["feed"])
+    s = _approve_recommended(client, s)
+    assert not any(e["title"] == "Staff En Route" for e in s["feed"])  # nobody confirmed yet
+    s = _reply(client, s).json()
+    en_route = [e for e in s["feed"] if e["title"] == "Staff En Route"]
+    assert len(en_route) == 1 and en_route[0]["clock"] == "16:30"
+    assert "shift starts 17:15" in en_route[0]["detail"]
+
+
+def test_provenance_reports_git_state(client):
+    body = client.get("/api/meta/provenance").json()
+    assert body["engine_version"]
+    assert isinstance(body["entire_checkpoints"], list)
+    assert body["entire_checkpoint_count"] == len(body["entire_checkpoints"])

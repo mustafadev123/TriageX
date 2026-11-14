@@ -59,7 +59,7 @@ The payload is about 245 KB uncompressed and about 12 KB with gzip.
 | Method and path | Purpose |
 |---|---|
 | `GET /api/health` | Liveness, branding, synthetic-data notice |
-| `GET /api/integrations/health` | Simulation `ok`; database, AI and Chert report `not_implemented` until their phases |
+| `GET /api/integrations/health` | Simulation `ok`. The database reports `not_configured`, `starting`, `ok` or `error`. AI and Chert report `not_implemented` until their phases. |
 | `GET /api/hospitals` | Map pins (synthetic capacity) |
 | `GET /api/scenarios` | Scenario selector |
 | `POST /api/demo/reset` | Body (optional): `{scenario_id, seed}`. Discards all runs and returns a new, identical initial state |
@@ -69,6 +69,8 @@ The payload is about 245 KB uncompressed and about 12 KB with gzip.
 | `POST /api/runs/{run_id}/proposals/{proposal_id}/approve` | Body: `{at_tick, operator?}`. `at_tick` (required) is the simulated approval time |
 | `POST /api/runs/{run_id}/staffing-requests/{request_id}/simulate-reply` | Body (optional): `{staff_id, reply: "IN"}`. Recorded as `simulated` |
 | `GET /api/runs/{run_id}/diagnostics` | Assumptions, limitations, forecast accuracy, all proposals, digests, recompute timings |
+| `GET /api/db/status`, `GET /api/runs/{run_id}/db/insights` | Tiger Data status and stored-row queries (see [database.md](database.md)) |
+| `GET /api/meta/provenance` | Running git commit and the Entire checkpoint refs in the repository |
 
 Error codes:
 
@@ -104,7 +106,7 @@ Every message is JSON, sent from the server to the client:
 | `markers` | Vertical chart lines | "Surge Begins", "Surge Predicted", "Outreach Approved", "Shift Active", "Futures Diverge"… |
 | `transitions` | Map color changes | Status changes per track and hospital |
 | `flows` | Map arcs | Rerouted ambulances per tick: `diversion` or `level_loading` |
-| `feed` | Coordination feed | Concise titles; `track`, `origin` and `severity` included |
+| `feed` | Coordination feed | Concise titles, including Outreach Proposed and Staff En Route; `track`, `origin` and `severity` included |
 | `proposals` | Action cards | Demo-window cards plus the recommended one |
 | `staffing_requests` | Outreach panel | Requested, confirmed and usable staff, status, confirmations with `source` |
 | `impact` | Hero metric | `primary` = ambulance hours lost to handoff delays; `secondary` = average wait and diverted ambulances; `recovery` |
@@ -136,7 +138,7 @@ never show an improvement before the intervention is active.
 
 Each `HeroMetric` carries `baseline`, `triagex`, `delta` (TriageX minus baseline),
 `pct_change`, `improved` (`null` when equal) and a ready-made `headline`, for example
-"9.2 fewer ambulance hours lost (−36%)". When the two values are equal, the headline
+"9.25 fewer ambulance hours lost (−36%)". When the two values are equal, the headline
 reads "No difference yet" before any intervention and "No change" after one.
 
 Simulated replies always have `source: "simulated"` in the request and
@@ -151,9 +153,9 @@ changes only after the confirmed staff start their shift at 17:15.
 
 | Confirmed staff | Primary headline | Average wait | Ambulances diverted | Recovery |
 |---|---|---|---|---|
-| 1 | 5.5 fewer ambulance hours lost (−22%) | 3.8 min shorter (−27%) | No change | 30 min sooner |
-| 2 | 8.2 fewer ambulance hours lost (−32%) | 5.8 min shorter (−41%) | 3 fewer (−30%) | 45 min sooner |
-| 3 | 9.2 fewer ambulance hours lost (−36%) | 6.8 min shorter (−48%) | 3 fewer (−30%) | 45 min sooner |
+| 1 | 5.50 fewer ambulance hours lost (−22%) | 3.8 min shorter (−27%) | No change | 30 min sooner |
+| 2 | 8.25 fewer ambulance hours lost (−32%) | 5.8 min shorter (−41%) | 3 fewer (−30%) | 45 min sooner |
+| 3 | 9.25 fewer ambulance hours lost (−36%) | 6.8 min shorter (−48%) | 3 fewer (−30%) | 45 min sooner |
 
 These are model outputs, not targets. Other scenarios and seeds give different results;
 see [assumptions.md](assumptions.md).

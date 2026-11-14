@@ -86,7 +86,11 @@ The schema lives in `db/migrations/` and is applied in order by
 
 1. After each state change (reset, approval, confirmation), the API builds an immutable
    snapshot in about 0.1 ms and returns the dashboard response immediately.
-2. A single background thread writes each snapshot in one transaction.
+2. A single background thread writes each snapshot in one transaction. The transaction
+   holds two statements: one statement with data-modifying CTEs and `unnest` arrays for
+   every table except metrics, and one batched insert into the hypertable. Against Tiger
+   Data (about 230 ms per network round trip from the demo laptop), a full snapshot takes
+   about 0.5 s. The earlier one-statement-per-row version took about 20 s.
 3. Every insert is idempotent: `ON CONFLICT DO NOTHING` or an upsert. The feed table is
    replaced per run inside the same transaction, so replaying a snapshot changes
    nothing.

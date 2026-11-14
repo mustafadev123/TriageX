@@ -8,7 +8,7 @@ from app.config import APP_NAME, SYNTHETIC_DATA_NOTICE, TAGLINE, get_settings
 
 router = APIRouter(tags=["health"])
 
-IntegrationStatus = Literal["ok", "not_configured", "not_implemented", "error"]
+IntegrationStatus = Literal["ok", "starting", "not_configured", "not_implemented", "error"]
 
 
 class HealthResponse(BaseModel):
@@ -63,8 +63,11 @@ def _database(request: Request) -> IntegrationHealth:
         f"TimescaleDB {status['timescaledb_version'] or 'not installed'}, metrics {storage}; "
         f"{writer['snapshots_written']} snapshots written, {writer['pending']} pending"
     )
-    healthy = writer["migrated"] and not writer["dead_letters"]
-    return IntegrationHealth(name="Tiger Data", status="ok" if healthy else "error", detail=detail)
+    if writer["dead_letters"]:
+        return IntegrationHealth(name="Tiger Data", status="error", detail=detail)
+    if not writer["migrated"]:  # connected; background migration still running
+        return IntegrationHealth(name="Tiger Data", status="starting", detail=detail)
+    return IntegrationHealth(name="Tiger Data", status="ok", detail=detail)
 
 
 @router.get("/integrations/health")

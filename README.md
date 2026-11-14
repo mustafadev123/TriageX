@@ -19,6 +19,8 @@ the modeled before-versus-after outcome.
 - Phase 3 (FastAPI dashboard API and WebSocket) is complete.
 - Phase 4 (Tiger Data persistence) is implemented and verified on local PostgreSQL. Live
   Tiger Data verification needs `DATABASE_URL`; see [docs/database.md](docs/database.md).
+- The frontend command center is complete. See [docs/demo-script.md](docs/demo-script.md)
+  for the 90-second walkthrough and [docs/screenshots/](docs/screenshots/).
 - The AI and messaging integrations are not implemented yet.
 
 See [docs/plan.md](docs/plan.md) for the plan,
@@ -80,5 +82,6 @@ The dashboard is at http://localhost:5173 and proxies `/api` and `/ws` to the ba
 
 ```powershell
 cd backend;  uv run pytest;  uv run ruff check .   # DB tests start a local PostgreSQL
-cd frontend; npm test;       npm run build
+cd frontend; npm test;       npm run build;  npm run lint
+cd frontend; npm run rehearse -- rehearsal 1366 768   # Edge walkthrough; needs both servers running
 ```
