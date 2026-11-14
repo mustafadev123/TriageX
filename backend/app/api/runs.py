@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.api.chert import start_outreach
 from app.models.dashboard import DashboardState, Diagnostics
 from app.repositories.persistence import build_snapshot
 from app.services.dashboard import build_dashboard, build_diagnostics
@@ -139,9 +140,12 @@ async def approve_proposal(
 ) -> DashboardState:
     service = _service(request)
     try:
-        run, _ = service.approve_proposal(run_id, proposal_id, body.at_tick, body.operator)
+        run, created = service.approve_proposal(run_id, proposal_id, body.at_tick, body.operator)
     except (NotFoundError, ConflictError) as exc:
         _raise(exc)
+    if created in run.staffing_requests:
+        # Live iMessage outreach (Phase 6): queued in the background, only when configured.
+        start_outreach(request.app, run, created)
     return await _respond(request, run, "proposal_approved")
 
 

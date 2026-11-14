@@ -111,7 +111,18 @@ UNION ALL SELECT 'staffing_requests', count(*) FROM staffing_requests WHERE run_
 UNION ALL SELECT 'staff_confirmations', count(*) FROM staff_confirmations c
           JOIN staffing_requests r USING (request_id) WHERE r.run_id = :run_id
 UNION ALL SELECT 'intervention_events', count(*) FROM intervention_events WHERE run_id = :run_id
-UNION ALL SELECT 'agent_activity', count(*) FROM agent_activity WHERE run_id = :run_id""",
+UNION ALL SELECT 'agent_activity', count(*) FROM agent_activity WHERE run_id = :run_id
+UNION ALL SELECT 'outreach_events', count(*) FROM outreach_events WHERE run_id = :run_id
+UNION ALL SELECT 'webhook_events', count(*) FROM webhook_events WHERE run_id = :run_id""",
+        "messaging_events": """
+SELECT 'outreach' AS kind, o.created_at AS at, o.recipient_mask AS who, o.status AS outcome,
+       o.send_ms AS ms
+FROM outreach_events o WHERE o.run_id = :run_id
+UNION ALL
+SELECT 'webhook', w.received_at, coalesce(o.recipient_mask, '—'), w.outcome, w.processing_ms
+FROM webhook_events w LEFT JOIN outreach_events o USING (outreach_id)
+WHERE w.run_id = :run_id
+ORDER BY at""",
     }
 
 

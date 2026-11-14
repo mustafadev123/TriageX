@@ -523,6 +523,7 @@ class WriterStatus:
     migration: MigrationReport | None = None
     pending: int = 0
     snapshots_written: int = 0
+    events_written: int = 0  # outreach and webhook rows
     rows_written: int = 0
     failed_attempts: int = 0
     dropped: int = 0
@@ -636,12 +637,16 @@ class PersistenceWriter:
                 self._ensure_ready()
                 if snapshot is not None:
                     started = time.perf_counter()
+                    is_event = hasattr(snapshot, "write")  # messaging rows (Phase 6)
                     with self.db.transaction() as con:
-                        rows = write_snapshot(con, snapshot)
+                        rows = snapshot.write(con) if is_event else write_snapshot(con, snapshot)
                     with self._cond:
                         self._queue.popleft()
                         self.status.pending = len(self._queue)
-                        self.status.snapshots_written += 1
+                        if is_event:
+                            self.status.events_written += 1
+                        else:
+                            self.status.snapshots_written += 1
                         self.status.rows_written += rows
                         self.status.last_success_at = datetime.now(UTC)
                         self.status.last_write_ms = round((time.perf_counter() - started) * 1000, 2)

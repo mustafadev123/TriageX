@@ -378,8 +378,11 @@ def test_integration_health_never_claims_unbuilt_integrations(client):
     assert h["simulation"]["status"] == "ok"
     # No DATABASE_URL in tests: implemented but not configured, never "ok".
     assert h["database"]["status"] == "not_configured"
-    for key in ("ai_primary", "ai_fallback", "messaging"):
+    for key in ("ai_primary", "ai_fallback"):
         assert h[key]["status"] == "not_implemented"
+    # Chert is implemented; without credentials it is not configured, never "ok".
+    assert h["messaging"]["status"] == "not_configured"
+    assert "CHERT_SIGNING_SECRET" in h["messaging"]["detail"]
 
 
 def test_websocket_pushes_run_updates(client):

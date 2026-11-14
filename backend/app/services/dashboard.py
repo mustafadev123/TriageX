@@ -25,7 +25,9 @@ from app.models.dashboard import (
     HospitalSeries,
     Impact,
     Marker,
+    MessagingView,
     Meta,
+    OutreachView,
     ProposalCard,
     RecoveryView,
     RunInfo,
@@ -344,12 +346,13 @@ def _requests(service: DemoService, run: Run) -> list[StaffingRequestView]:
                     )
                     for c in r.confirmations
                 ],
+                outreach=_outreach(service, r.request_id),
             )  # fmt: skip
         )
     return out
 
 
-def _feed(run: Run, divergence: int | None) -> list[FeedEvent]:
+def _feed(service: DemoService, run: Run, divergence: int | None) -> list[FeedEvent]:
     sc, c, net = run.scenario, run.comparison, run.network
     label = sc.clock_label
     events: list[tuple[int, int, FeedEvent]] = []
@@ -410,6 +413,15 @@ def _feed(run: Run, divergence: int | None) -> list[FeedEvent]:
         )
     for r in run.staffing_requests.values():
         name = net.get(r.hospital_id).short_name
+        sent = [o for o in (service.messaging.records_for(r.request_id) if service.messaging
+                            else []) if o.sent_at is not None]  # fmt: skip
+        if sent:
+            add(3, tick=r.approved_tick, title="iMessage Sent",
+                detail=(f"TriageX DEMO outreach delivered to Chert for {len(sent)} opted-in "
+                        f"teammate{'s' if len(sent) != 1 else ''} "
+                        f"({', '.join(o.masked for o in sent)})"),
+                kind="outreach_sent", track="triagex", origin="live_message", severity="info",
+                hospital_id=r.hospital_id, wall_time=min(o.sent_at for o in sent))  # fmt: skip
         for i, conf in enumerate(r.confirmations, start=1):
             add(
                 3,
@@ -417,7 +429,8 @@ def _feed(run: Run, divergence: int | None) -> list[FeedEvent]:
                 title="Staff Confirmed",
                 detail=(
                     f"{conf.display_name} confirmed for {name} ({i}/{r.requested_staff})"
-                    + (" via simulated reply" if conf.source != "webhook" else "")
+                    + (" via simulated reply" if conf.source != "webhook"
+                       else " via live iMessage reply")  # fmt: skip
                 ),
                 kind="staff_confirmed",
                 track="triagex",
@@ -546,6 +559,34 @@ def _markers(run: Run) -> list[Marker]:
     return out
 
 
+def _messaging(service: DemoService) -> MessagingView:
+    outreach = service.messaging
+    if outreach is None:
+        return MessagingView()
+    status, detail = outreach.health()
+    last = outreach.last_webhook
+    return MessagingView(
+        live=status == "ok",
+        status=status,
+        detail=detail,
+        recipients=len(outreach.config.allowed_phones),
+        last_webhook_outcome=last.outcome if last else None,
+        last_webhook_ms=last.processing_ms if last else None,
+    )
+
+
+def _outreach(service: DemoService, request_id: str) -> list[OutreachView]:
+    if service.messaging is None:
+        return []
+    return [
+        OutreachView(
+            outreach_id=r.outreach_id, recipient=r.masked, status=r.status, sent_at=r.sent_at,
+            confirmed_at=r.confirmed_at, error=r.error, send_ms=r.send_ms,
+        )  # fmt: skip
+        for r in service.messaging.records_for(request_id)
+    ]
+
+
 def build_dashboard(service: DemoService, run: Run) -> DashboardState:
     started = time.perf_counter()
     sc, c = run.scenario, run.comparison
@@ -598,13 +639,14 @@ def build_dashboard(service: DemoService, run: Run) -> DashboardState:
         markers=_markers(run),
         transitions=_transitions(run),
         flows=_flows(run),
-        feed=_feed(run, divergence),
+        feed=_feed(service, run, divergence),
         proposals=_cards(run, only_window=True),
         staffing_requests=_requests(service, run),
         impact=_impact(run, curves),
         divergence=Divergence(tick=divergence, clock=sc.clock_label(divergence))
         if divergence is not None
         else None,
+        messaging=_messaging(service),
         meta=Meta(generated_at=datetime.now(UTC), recompute_ms=run.last_recompute_ms, build_ms=0),
     )
     state.meta.build_ms = round((time.perf_counter() - started) * 1000, 2)

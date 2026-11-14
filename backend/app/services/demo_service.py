@@ -62,7 +62,7 @@ class ConflictError(RuntimeError):
 class ConfirmationRecord:
     staff_id: str
     display_name: str
-    source: str  # "simulated" now; "webhook" once Chert is integrated
+    source: str  # "simulated" (dashboard fallback) or "webhook" (verified Chert reply)
     received_at: datetime
     recompute_ms: float
 
@@ -180,6 +180,8 @@ class DemoService:
         self._lock = threading.RLock()
         self._runs: dict[str, Run] = {}
         self._active_run_id: str | None = None
+        # Set by OutreachService; lets the dashboard show live-messaging state per request.
+        self.messaging = None
 
     # --- runs -----------------------------------------------------------------------
     def create_run(self, scenario_id: str = DEFAULT_SCENARIO_ID, seed: int = DEFAULT_SEED) -> Run:
@@ -291,8 +293,30 @@ class DemoService:
         """Dashboard fallback for a staff reply. Always labeled as simulated."""
         return self._record_reply(run_id, request_id, staff_id, reply, source="simulated")
 
+    def confirm_live(
+        self, run_id: str, request_id: str, staff_id: str, display_name: str, reply: str
+    ) -> tuple[Run, ConfirmationRecord]:
+        """A verified Chert webhook reply. Same validation and recompute as the fallback."""
+        return self._record_reply(
+            run_id, request_id, staff_id, reply, source="webhook", display_name=display_name
+        )
+
+    def touch(self, run_id: str) -> Run:
+        """Bump the version after a change outside the simulation (e.g. outreach sent), so
+        dashboards refetch and the change is persisted as its own version."""
+        with self._lock:
+            run = self.get_run(run_id)
+            run.version += 1
+            return run
+
     def _record_reply(
-        self, run_id: str, request_id: str, staff_id: str | None, reply: str, source: str
+        self,
+        run_id: str,
+        request_id: str,
+        staff_id: str | None,
+        reply: str,
+        source: str,
+        display_name: str | None = None,
     ) -> tuple[Run, ConfirmationRecord]:
         with self._lock:
             run = self.get_run(run_id)
@@ -307,7 +331,12 @@ class DemoService:
             if request.confirmed_staff >= request.requested_staff:
                 raise ConflictError(f"Staffing request '{request_id}' is already fully confirmed")
             confirmed_ids = {c.staff_id for c in request.confirmations}
-            if staff_id is None:
+            if source == "webhook":
+                if not staff_id or not display_name:
+                    raise ConflictError("A live confirmation needs a recipient identity")
+                if staff_id in confirmed_ids:
+                    raise ConflictError("This recipient has already confirmed this request")
+            elif staff_id is None:
                 staff_id = next((sid for sid, _ in DEMO_STAFF if sid not in confirmed_ids), None)
                 if staff_id is None:
                     raise ConflictError("Every fictional demo staff member has already replied")
@@ -316,7 +345,8 @@ class DemoService:
             elif staff_id in confirmed_ids:
                 raise ConflictError(f"'{staff_id}' has already confirmed this request")
 
-            record = ConfirmationRecord(staff_id, STAFF_NAMES[staff_id], source, now, 0.0)
+            name = display_name if source == "webhook" else STAFF_NAMES[staff_id]
+            record = ConfirmationRecord(staff_id, name, source, now, 0.0)
             request.confirmations.append(record)
             record.recompute_ms = run.recompute()
             run.version += 1

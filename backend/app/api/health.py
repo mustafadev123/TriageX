@@ -70,6 +70,13 @@ def _database(request: Request) -> IntegrationHealth:
     return IntegrationHealth(name="Tiger Data", status="ok", detail=detail)
 
 
+def _messaging(request: Request) -> IntegrationHealth:
+    # "ok" only after Chert accepted the credentials (GET /whoami) and the webhook secret,
+    # allowlist, public URL, and a matching subscription are all in place.
+    status, detail = request.app.state.outreach.health()
+    return IntegrationHealth(name="Chert iMessage", status=status, detail=detail)
+
+
 @router.get("/integrations/health")
 def integrations_health(request: Request) -> IntegrationsResponse:
     s = get_settings()
@@ -80,6 +87,6 @@ def integrations_health(request: Request) -> IntegrationsResponse:
         database=_database(request),
         ai_primary=_pending("OpenAI", bool(s.openai_api_key), 5),
         ai_fallback=_pending("Gemini", bool(s.gemini_api_key), 5),
-        messaging=_pending("Chert", bool(s.chert_signing_secret), 6),
+        messaging=_messaging(request),
         websocket_clients=request.app.state.ws_manager.count,
     )

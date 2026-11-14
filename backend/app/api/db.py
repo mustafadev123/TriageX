@@ -56,6 +56,7 @@ def database_status(writer: PersistenceWriter) -> dict:
         "writer": {
             "pending": status.pending,
             "snapshots_written": status.snapshots_written,
+            "events_written": status.events_written,
             "rows_written": status.rows_written,
             "failed_attempts": status.failed_attempts,
             "dropped": status.dropped,

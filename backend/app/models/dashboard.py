@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 TrackName = Literal["baseline", "triagex"]
 StatusName = Literal["normal", "pressure", "breach"]
-Origin = Literal["simulation", "operator", "simulated_reply", "webhook"]
+Origin = Literal["simulation", "operator", "simulated_reply", "webhook", "live_message"]
 Severity = Literal["info", "warning", "critical", "success"]
 CurvePhase = Literal["before_intervention", "staff_en_route", "shift_active", "after_shift"]
 
@@ -180,6 +180,30 @@ class Confirmation(BaseModel):
     received_at: datetime
 
 
+class OutreachView(BaseModel):
+    """One live iMessage to an opted-in recipient (the number is never exposed)."""
+
+    outreach_id: str
+    recipient: str  # masked, e.g. "•••1234"
+    status: Literal["sending", "sent", "failed", "confirmed"]
+    sent_at: datetime | None = None
+    confirmed_at: datetime | None = None
+    error: str | None = None
+    send_ms: float | None = None
+
+
+class MessagingView(BaseModel):
+    """Whether live Chert outreach is available. `live` is true only after Chert accepted
+    the credentials and every inbound prerequisite is configured."""
+
+    live: bool = False
+    status: Literal["ok", "starting", "not_configured", "error"] = "not_configured"
+    detail: str = "Live iMessage not configured"
+    recipients: int = 0
+    last_webhook_outcome: str | None = None
+    last_webhook_ms: float | None = None
+
+
 class StaffingRequestView(BaseModel):
     request_id: str
     proposal_id: str
@@ -198,6 +222,7 @@ class StaffingRequestView(BaseModel):
     approved_at: datetime
     expires_at: datetime
     confirmations: list[Confirmation]
+    outreach: list[OutreachView] = []
 
 
 class HeroMetric(BaseModel):
@@ -259,6 +284,7 @@ class DashboardState(BaseModel):
     staffing_requests: list[StaffingRequestView]
     impact: Impact
     divergence: Divergence | None
+    messaging: MessagingView = MessagingView()
     meta: Meta
 
 

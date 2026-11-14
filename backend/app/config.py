@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     chert_webhook_secret: str | None = None
     demo_allowed_phones: str = ""
     public_base_url: str | None = None
+    chert_api_base: str | None = None  # defaults to https://console.trychert.com/api/v1
 
     @property
     def cors_origin_list(self) -> list[str]:

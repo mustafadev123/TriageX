@@ -8,6 +8,10 @@ PostgreSQL with pgserver; if neither is available they are skipped (and reported
 import os
 
 os.environ["DATABASE_URL"] = ""
+# Never use real Chert credentials or phone numbers in tests (Phase 6).
+for _key in ("CHERT_SIGNING_SECRET", "CHERT_TENANT", "CHERT_WEBHOOK_SECRET",
+             "DEMO_ALLOWED_PHONES", "PUBLIC_BASE_URL", "CHERT_API_BASE"):  # fmt: skip
+    os.environ[_key] = ""
 
 import logging  # noqa: E402
 import tempfile  # noqa: E402
