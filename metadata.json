@@ -1,0 +1,56 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M7CAT247JZ3CS26NW0QS1R4Z",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "backend/app/api/chert.py",
+    "backend/app/api/db.py",
+    "backend/app/api/health.py",
+    "backend/app/api/runs.py",
+    "backend/app/config.py",
+    "backend/app/integrations/chert.py",
+    "backend/app/main.py",
+    "backend/app/models/dashboard.py",
+    "backend/app/repositories/messaging.py",
+    "backend/app/repositories/persistence.py",
+    "backend/app/repositories/queries.py",
+    "backend/app/services/dashboard.py",
+    "backend/app/services/demo_service.py",
+    "backend/app/services/outreach.py",
+    "backend/tests/conftest.py",
+    "backend/tests/test_api_demo.py",
+    "db/migrations/003_messaging.sql"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 92,
+    "cache_creation_tokens": 132376,
+    "cache_read_tokens": 6090406,
+    "output_tokens": 47211,
+    "api_call_count": 44
+  },
+  "redaction": {
+    "replacements": 41,
+    "layers": {
+      "betterleaks": 8,
+      "connection_string": 5,
+      "credential_key": 0,
+      "credential_value": 9,
+      "credentialed_uri": 8,
+      "entropy": 3,
+      "key_context": 11,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
