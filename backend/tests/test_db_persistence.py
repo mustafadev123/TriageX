@@ -84,6 +84,7 @@ def test_migrations_apply_once_and_are_idempotent(database):
         "hospitals", "scenarios", "simulation_runs", "run_versions", "hospital_metrics",
         "comparison_metrics", "staffing_requests", "staff_confirmations",
         "intervention_events", "agent_activity", "schema_migrations",
+        "outreach_events", "webhook_events",
     } <= tables  # fmt: skip
     if first.timescaledb_version:
         assert first.hypertable, first.hypertable_note

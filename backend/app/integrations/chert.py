@@ -217,6 +217,13 @@ class ChertClient:
                           + (f": {reason}" if reason else ""),
                           latency_ms=_ms(started))  # fmt: skip
 
+    def create_subscription(self, url: str) -> tuple[int, dict]:
+        """POST /webhook-subscriptions for message.received. The response carries
+        subscription.secret exactly once."""
+        resp = self._request("POST", "/webhook-subscriptions",
+                             {"url": url, "events": ["message.received"]})  # fmt: skip
+        return resp.status_code, _json(resp)
+
     def check(self) -> CheckResult:
         """Credential check: GET /whoami, then list webhook subscriptions."""
         try:

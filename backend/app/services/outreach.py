@@ -178,7 +178,8 @@ class OutreachService:
         self.clock = clock
         self._lock = threading.RLock()
         self._records: dict[str, OutreachRecord] = {}
-        self._seen: OrderedDict[str, str] = OrderedDict()
+        # event_id -> (first outcome, correlated outreach record) for at-least-once dedup
+        self._seen: OrderedDict[str, tuple[str, OutreachRecord | None]] = OrderedDict()
         self.check_result: CheckResult | None = None
         self.checking = False
         self.checked_at: datetime | None = None
@@ -330,10 +331,11 @@ class OutreachService:
 
         with self._lock:  # one delivery at a time: dedup and confirmation are atomic
             if event.event_id in self._seen:
-                previous = self._seen[event.event_id]
-                return self._done(event, 200, "duplicate_event", f"already processed ({previous})")
+                previous, record = self._seen[event.event_id]
+                return self._done(event, 200, "duplicate_event",
+                                  f"already processed ({previous})", record=record)  # fmt: skip
             result = self._process(event)
-            self._seen[event.event_id] = result.outcome
+            self._seen[event.event_id] = (result.outcome, result.record)
             while len(self._seen) > SEEN_EVENTS_MAX:
                 self._seen.popitem(last=False)
             return result
