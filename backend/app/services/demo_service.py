@@ -73,8 +73,9 @@ class StaffingRequest:
     proposal_id: str
     hospital_id: str
     requested_staff: int
-    approved_tick: int
-    approved_at: datetime
+    proposal_tick: int  # simulated time the forecast raised the proposal
+    approved_tick: int  # simulated time the operator approved; the lead time starts here
+    approved_at: datetime  # wall-clock time of the approval
     expires_at: datetime
     operator: str
     confirmations: list[ConfirmationRecord] = field(default_factory=list)
@@ -234,15 +235,17 @@ class DemoService:
 
     # --- operator actions -----------------------------------------------------------
     def approve_proposal(
-        self, run_id: str, proposal_id: str, at_tick: int | None = None, operator: str = "operator"
+        self, run_id: str, proposal_id: str, at_tick: int, operator: str = "operator"
     ) -> tuple[Run, str]:
-        """Approve a proposal. Returns the run and the created request/intervention id."""
+        """Approve a proposal at simulated tick `at_tick` (the playhead when the operator
+        clicked). The 45-minute staffing lead time starts at `at_tick`, never at the
+        proposal tick. Returns the run and the created request/intervention id."""
         with self._lock:
             run = self.get_run(run_id)
             proposal = run.find_proposal(proposal_id)
             if proposal_id in run.approved_proposals:
                 raise ConflictError(f"Proposal '{proposal_id}' is already approved")
-            tick = proposal.tick if at_tick is None else at_tick
+            tick = at_tick
             if not (proposal.tick <= tick < run.scenario.horizon_ticks):
                 raise ConflictError(
                     f"Approval tick {tick} must be between the proposal tick {proposal.tick} "
@@ -256,6 +259,7 @@ class DemoService:
                     proposal_id=proposal.id,
                     hospital_id=proposal.hospital_id,
                     requested_staff=proposal.recommended_staff or 1,
+                    proposal_tick=proposal.tick,
                     approved_tick=tick,
                     approved_at=now,
                     expires_at=now + self.request_ttl,

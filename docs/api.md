@@ -14,24 +14,42 @@ deltas or percentages itself.
 | Step | Call | What changes |
 |---|---|---|
 | 1. Reset | `POST /api/demo/reset` | Fresh I-85 run, seed 42. Both futures are identical. |
-| 2. Approve outreach | `POST /api/runs/{run_id}/proposals/{proposal_id}/approve` | Creates a staffing request. No outcome changes yet. |
+| 2. Approve outreach | `POST /api/runs/{run_id}/proposals/{proposal_id}/approve` with `{"at_tick": <playhead tick>}` | Creates a staffing request. No outcome changes yet. |
 | 3. Staff confirms (repeat) | `POST /api/runs/{run_id}/staffing-requests/{request_id}/simulate-reply` | Adds one confirmation and recalculates Track B. |
 | 4. Read diagnostics (optional) | `GET /api/runs/{run_id}/diagnostics` | Engineering detail for judge Q&A. |
 
 Every `POST` returns the complete `DashboardState`, so the screen re-renders from the
 response without another request.
 
-For step 2, use the card with `recommended: true` in `proposals`.
+For step 2, use the card with `recommended: true` in `proposals`. Send `at_tick`, the
+simulated tick at which the operator clicked Approve (the playhead position).
 
-In step 3, each confirmation counts in the simulation from the approved request tick
-plus 45 simulated minutes. That holds no matter when the reply arrives in real time.
-History is never rewritten: ticks before that point are identical in both tracks.
+- `at_tick` is required. The server never assumes the approval happened at the proposal
+  tick.
+- It must be no earlier than the proposal tick.
+- The 45-minute staffing lead time starts at `at_tick`.
+
+In step 3, each confirmation counts in the simulation from the approval tick plus 45
+simulated minutes. That holds no matter when the reply arrives in real time. History is
+never rewritten: ticks before that point are identical in both tracks.
+
+I-85 example timeline:
+
+| Event | Simulated time |
+|---|---|
+| Surge Predicted | 16:15 |
+| Outreach Approved (`at_tick` 18) | 16:30 |
+| Staff en route (lead-time band) | 16:30–17:15 |
+| Shift Active, Futures Diverge | 17:15 |
+
+A request reports `proposal_clock`, `approved_clock` and `effective_clock`. Feed events
+for confirmations sit at the approval tick, inside the lead-time band.
 
 Measured on the development laptop (live uvicorn, curl, 5 rounds × 3 replies):
 
 | Operation | Time |
 |---|---|
-| One confirmation, end to end | 25–30 ms (about 12 ms recalculating Track B, about 4 ms building the payload) |
+| One confirmation, full HTTP round trip | 25.7–28.2 ms (about 12 ms recalculating Track B, 4–6 ms building the payload, the rest serialization and transport) |
 | Reset | about 47 ms |
 
 The payload is about 245 KB uncompressed and about 12 KB with gzip.
@@ -48,7 +66,7 @@ The payload is about 245 KB uncompressed and about 12 KB with gzip.
 | `GET /api/demo/state` | The active run's state (for a second screen or a page refresh) |
 | `POST /api/runs` | Body: `{scenario_id, seed}`. New run without discarding others |
 | `GET /api/runs/{run_id}` | Current `DashboardState` |
-| `POST /api/runs/{run_id}/proposals/{proposal_id}/approve` | Body (optional): `{at_tick, operator}`. `at_tick` defaults to the proposal tick |
+| `POST /api/runs/{run_id}/proposals/{proposal_id}/approve` | Body: `{at_tick, operator?}`. `at_tick` (required) is the simulated approval time |
 | `POST /api/runs/{run_id}/staffing-requests/{request_id}/simulate-reply` | Body (optional): `{staff_id, reply: "IN"}`. Recorded as `simulated` |
 | `GET /api/runs/{run_id}/diagnostics` | Assumptions, limitations, forecast accuracy, all proposals, digests, recompute timings |
 
@@ -58,7 +76,7 @@ Error codes:
 - **409:** a state conflict. That covers approving a proposal twice, approving before
   the proposal tick, a reply other than `IN`, a duplicate reply, a fully confirmed
   request, or an expired request (10 minutes of real time).
-- **422:** invalid input.
+- **422:** invalid input, including a missing `at_tick`.
 
 ## WebSocket `/ws`
 
@@ -118,18 +136,24 @@ never show an improvement before the intervention is active.
 
 Each `HeroMetric` carries `baseline`, `triagex`, `delta` (TriageX minus baseline),
 `pct_change`, `improved` (`null` when equal) and a ready-made `headline`, for example
-"11.5 fewer ambulance hours lost (−45%)".
+"9.2 fewer ambulance hours lost (−36%)". When the two values are equal, the headline
+reads "No difference yet" before any intervention and "No change" after one.
+
+Simulated replies always have `source: "simulated"` in the request and
+`origin: "simulated_reply"` in the feed, and their detail ends with "via simulated
+reply". Nothing is labeled as a sent or received message until the Chert integration
+exists (Phase 6).
 
 ## Current I-85 result (seed 42)
 
-The run approves the recommended Grady staffing proposal at 16:15. Track B changes only
-after the confirmed staff start their shift at 17:00.
+The recommended Grady staffing proposal is raised at 16:15 and approved at 16:30. Track B
+changes only after the confirmed staff start their shift at 17:15.
 
-| Confirmed staff | Primary headline | Average wait | Recovery |
-|---|---|---|---|
-| 1 | 6.5 fewer ambulance hours lost (−26%) | 4.2 min shorter (−29%) | 15 min sooner |
-| 2 | 9.8 fewer ambulance hours lost (−38%) | 6.2 min shorter (−44%) | 45 min sooner |
-| 3 | 11.5 fewer ambulance hours lost (−45%) | 7.4 min shorter (−52%) | 45 min sooner |
+| Confirmed staff | Primary headline | Average wait | Ambulances diverted | Recovery |
+|---|---|---|---|---|
+| 1 | 5.5 fewer ambulance hours lost (−22%) | 3.8 min shorter (−27%) | No change | 30 min sooner |
+| 2 | 8.2 fewer ambulance hours lost (−32%) | 5.8 min shorter (−41%) | 3 fewer (−30%) | 45 min sooner |
+| 3 | 9.2 fewer ambulance hours lost (−36%) | 6.8 min shorter (−48%) | 3 fewer (−30%) | 45 min sooner |
 
 These are model outputs, not targets. Other scenarios and seeds give different results;
 see [assumptions.md](assumptions.md).

@@ -40,9 +40,15 @@ def _reset(client, **body):
     return r.json()
 
 
-def _approve_recommended(client, state):
-    pid = next(p["id"] for p in state["proposals"] if p["recommended"])
-    r = client.post(f"/api/runs/{state['run']['run_id']}/proposals/{pid}/approve")
+APPROVAL_DELAY_TICKS = 1  # the operator approves 15 simulated minutes after the proposal
+
+
+def _approve_recommended(client, state, delay=APPROVAL_DELAY_TICKS):
+    card = next(p for p in state["proposals"] if p["recommended"])
+    r = client.post(
+        f"/api/runs/{state['run']['run_id']}/proposals/{card['id']}/approve",
+        json={"at_tick": card["tick"] + delay},
+    )
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -131,6 +137,91 @@ def test_approval_alone_changes_no_outcome(client):
     assert {b["kind"] for b in s["bands"]} >= {"demo_window", "staff_lead_time"}
 
 
+def test_lead_time_starts_at_operator_approval_not_at_proposal(client):
+    """I-85: proposal 16:15, approval 16:30, staff on the floor 17:15."""
+    s = _approve_recommended(client, _reset(client), delay=1)
+    for _ in range(3):
+        s = _reply(client, s).json()
+    req = s["staffing_requests"][0]
+    assert (req["proposal_clock"], req["approved_clock"], req["effective_clock"]) == (
+        "16:15", "16:30", "17:15")  # fmt: skip
+    assert req["effective_tick"] == req["approved_tick"] + 3 == req["proposal_tick"] + 4
+
+    bands = {b["kind"]: b for b in s["bands"]}
+    assert (bands["staff_lead_time"]["start_tick"], bands["staff_lead_time"]["end_tick"]) == (
+        req["approved_tick"], req["effective_tick"])  # fmt: skip
+    assert bands["shift_active"]["start_tick"] == req["effective_tick"]
+
+    feed = {}
+    for e in s["feed"]:  # first in-window occurrence of each title at the focus hospital
+        if e["in_demo_window"] and e["hospital_id"] in (None, "grady"):
+            feed.setdefault(e["title"], e)
+    assert feed["Surge Predicted"]["clock"] == "16:15"
+    assert feed["Outreach Approved"]["clock"] == "16:30"
+    assert "17:15" in feed["Outreach Approved"]["detail"]
+    assert feed["Staff Confirmed"]["clock"] == "16:30"
+    assert feed["Shift Active"]["clock"] == "17:15"
+
+    markers = {(m["kind"], m["clock"]) for m in s["markers"]}
+    assert ("approval", "16:30") in markers and ("shift_active", "17:15") in markers
+
+    phases = {p["clock"]: p["phase"] for p in s["curves"]["points"]}
+    assert phases["16:15"] == "before_intervention"
+    assert phases["16:30"] == phases["17:00"] == "staff_en_route"
+    assert phases["17:15"] == "shift_active"
+
+    grady = next(h for h in s["series"] if h["hospital_id"] == "grady")["triagex"]
+    assert grady[req["effective_tick"] - 1]["staff_on_duty"] == 13
+    assert grady[req["effective_tick"]]["staff_on_duty"] == 16
+    assert s["divergence"]["tick"] >= req["effective_tick"]
+
+
+def test_later_approval_moves_activation_later(client):
+    early = _approve_recommended(client, _reset(client), delay=0)
+    late = _approve_recommended(client, _reset(client), delay=4)
+    e, lt = early["staffing_requests"][0], late["staffing_requests"][0]
+    assert lt["approved_tick"] - e["approved_tick"] == 4
+    assert lt["effective_tick"] - e["effective_tick"] == 4
+
+
+def test_each_confirmation_recomputes_track_b_only(client):
+    s = _approve_recommended(client, _reset(client))
+    run_id = s["run"]["run_id"]
+    digests = [client.get(f"/api/runs/{run_id}/diagnostics").json()["track_digests"]]
+    for _ in range(3):
+        s = _reply(client, s).json()
+        digests.append(client.get(f"/api/runs/{run_id}/diagnostics").json()["track_digests"])
+    assert len({d["baseline"] for d in digests}) == 1  # baseline never changes
+    assert len({d["triagex"] for d in digests}) == 4  # every confirmation changes Track B
+    assert digests[0]["baseline"] == digests[0]["triagex"]  # identical before confirmations
+
+
+def test_impact_is_computed_from_the_returned_series(client):
+    """The hero numbers can be re-derived from the series in the same response."""
+    s = _confirm_all(client)
+    start, end = (
+        s["timeline"]["demo_window"]["start_tick"],
+        s["timeline"]["demo_window"]["end_tick"],
+    )
+
+    def ambulance_hours(track):
+        waiting = sum(
+            h[track][t]["ambulances_waiting"] for h in s["series"] for t in range(start, end)
+        )
+        return round(waiting * 15 / 60, 2)
+
+    primary = s["impact"]["primary"]
+    assert primary["baseline"] == ambulance_hours("baseline")
+    assert primary["triagex"] == ambulance_hours("triagex")
+    focus = next(h for h in s["series"] if h["hospital_id"] == s["curves"]["focus_hospital_id"])
+    for p in s["curves"]["points"]:
+        t = p["tick"]
+        assert p["baseline_focus_saturation_pct"] == focus["baseline"][t]["saturation_pct"]
+        assert p["triagex_patients_waiting"] == sum(
+            h["triagex"][t]["queue_length"] for h in s["series"]
+        )
+
+
 def test_confirmations_move_only_the_future_after_activation(client):
     initial = _reset(client)
     s = _confirm_all(client)
@@ -182,6 +273,11 @@ def test_simulated_replies_are_labeled(client):
     confirmed = [e for e in s["feed"] if e["title"] == "Staff Confirmed"]
     assert len(confirmed) == 3
     assert all(e["origin"] == "simulated_reply" for e in confirmed)
+    assert all("via simulated reply" in e["detail"] for e in confirmed)
+    # Nothing in the payload claims a real message was sent or received.
+    assert not any(e["origin"] == "webhook" for e in s["feed"])
+    assert not any("message sent" in e["title"].lower() for e in s["feed"])
+    assert "Chert" not in str(s["feed"])
     titles = [e["title"] for e in s["feed"]]
     for title in ("Surge Predicted", "Outreach Approved", "Staff Confirmed", "Shift Active",
                   "Capacity Recalculated", "Futures Diverge"):  # fmt: skip
@@ -206,7 +302,10 @@ def test_level_loading_approval_recalculates(client):
     ll = next(
         p for p in s["proposals"] if p["kind"] == "level_loading" and p["hospital_id"] == "grady"
     )
-    r = client.post(f"/api/runs/{s['run']['run_id']}/proposals/{ll['id']}/approve")
+    r = client.post(
+        f"/api/runs/{s['run']['run_id']}/proposals/{ll['id']}/approve",
+        json={"at_tick": ll["tick"] + 1},
+    )
     assert r.status_code == 200
     body = r.json()
     assert any(b["kind"] == "level_loading_active" for b in body["bands"])
@@ -222,13 +321,17 @@ def test_error_responses(client, clock):
     tick = next(p["tick"] for p in s["proposals"] if p["recommended"])
 
     assert client.get("/api/runs/nope").status_code == 404
-    assert client.post(f"/api/runs/{run_id}/proposals/nope/approve").status_code == 404
+    nope = client.post(f"/api/runs/{run_id}/proposals/nope/approve", json={"at_tick": tick})
+    assert nope.status_code == 404
+    missing_tick = client.post(f"/api/runs/{run_id}/proposals/{pid}/approve")
+    assert missing_tick.status_code == 422  # the approval time is never assumed
     assert client.post("/api/demo/reset", json={"scenario_id": "nope"}).status_code == 422
     early = client.post(f"/api/runs/{run_id}/proposals/{pid}/approve", json={"at_tick": tick - 1})
     assert early.status_code == 409
 
     s = _approve_recommended(client, s)
-    assert client.post(f"/api/runs/{run_id}/proposals/{pid}/approve").status_code == 409
+    again = client.post(f"/api/runs/{run_id}/proposals/{pid}/approve", json={"at_tick": tick + 2})
+    assert again.status_code == 409
     bad_req = client.post(f"/api/runs/{run_id}/staffing-requests/nope/simulate-reply")
     assert bad_req.status_code == 404
     assert _reply(client, s, reply="NO").status_code == 409

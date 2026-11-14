@@ -38,6 +38,7 @@ from app.models.dashboard import (
 from app.services.demo_service import DemoService, Run
 from app.simulation.comparison import MetricDelta, track_digest
 from app.simulation.forecast import FORECAST_HORIZON_TICKS
+from app.simulation.interventions import STAFF_LEAD_TICKS
 from app.simulation.metrics import (
     ambulance_waiting_hours_by_tick,
     hospital_recovery,
@@ -86,11 +87,12 @@ def _hero(
     d: MetricDelta,
     phrases: tuple[str, str],
     decimals: int = 1,
+    intervention_scheduled: bool = False,
 ) -> HeroMetric:
     """`phrases` = (when lower, when higher), e.g. ("fewer ambulance hours lost", ...)."""
     improved = None if d.delta == 0 else d.delta < 0
     if d.delta == 0:
-        headline = "No difference yet"
+        headline = "No change" if intervention_scheduled else "No difference yet"
     else:
         pct = f" ({d.pct_change:+.0f}%)" if d.pct_change is not None else ""
         headline = f"{abs(d.delta):.{decimals}f} {phrases[0] if improved else phrases[1]}{pct}"
@@ -195,24 +197,27 @@ def _recovery(run: Run) -> RecoveryView:
 def _impact(run: Run, curves: Curves) -> Impact:
     c = run.comparison
     last = curves.points[-1]
+    has_effect = any(r.confirmed_staff > 0 for r in run.staffing_requests.values()) or bool(
+        run.level_loading
+    )
     primary = _hero(
         "ambulance_handoff_hours",
         "Ambulance hours lost to handoff delays",
         "ambulance hours",
         _delta(last.baseline_ambulance_hours_cumulative, last.triagex_ambulance_hours_cumulative),
         ("fewer ambulance hours lost", "more ambulance hours lost"),
+        intervention_scheduled=has_effect,
     )
     secondary = [
         _hero("mean_wait_minutes", "Average patient wait", "min",
               c.window_deltas["mean_wait_minutes"],
-              ("min shorter average wait", "min longer average wait")),
+              ("min shorter average wait", "min longer average wait"),
+              intervention_scheduled=has_effect),
         _hero("diverted_ambulances", "Ambulances diverted", "ambulances",
               c.window_deltas["diverted_ambulances"],
-              ("fewer ambulances diverted", "more ambulances diverted"), decimals=0),
+              ("fewer ambulances diverted", "more ambulances diverted"), decimals=0,
+              intervention_scheduled=has_effect),
     ]  # fmt: skip
-    has_effect = any(r.confirmed_staff > 0 for r in run.staffing_requests.values()) or bool(
-        run.level_loading
-    )
     return Impact(
         state="intervention_scheduled" if has_effect else "awaiting_intervention",
         primary=primary,
@@ -320,8 +325,12 @@ def _requests(service: DemoService, run: Run) -> list[StaffingRequestView]:
                 confirmed_staff=r.confirmed_staff,
                 usable_staff=effect.usable_staff if effect and effect.usable_staff else 0,
                 status=service.request_status(r),
+                proposal_tick=r.proposal_tick,
+                proposal_clock=run.scenario.clock_label(r.proposal_tick),
                 approved_tick=r.approved_tick,
+                approved_clock=run.scenario.clock_label(r.approved_tick),
                 effective_tick=iv.effective_tick,
+                effective_clock=run.scenario.clock_label(iv.effective_tick),
                 end_tick=iv.end_tick,
                 approved_at=r.approved_at,
                 expires_at=r.expires_at,
@@ -372,7 +381,11 @@ def _feed(run: Run, divergence: int | None) -> list[FeedEvent]:
     for a in run.actions:
         name = net.get(a.hospital_id).short_name
         if a.kind == "outreach_approved":
-            title, detail = "Outreach Approved", f"Staff outreach approved for {name}"
+            title = "Outreach Approved"
+            detail = (
+                f"Staff outreach approved for {name}; confirmed staff on the floor by "
+                f"{label(a.tick + STAFF_LEAD_TICKS)}"
+            )
         else:
             title, detail = "Level-Loading Approved", f"Redirect low-acuity ambulances from {name}"
         add(
@@ -394,7 +407,10 @@ def _feed(run: Run, divergence: int | None) -> list[FeedEvent]:
                 3,
                 tick=r.approved_tick,
                 title="Staff Confirmed",
-                detail=f"{conf.display_name} confirmed for {name} ({i}/{r.requested_staff})",
+                detail=(
+                    f"{conf.display_name} confirmed for {name} ({i}/{r.requested_staff})"
+                    + (" via simulated reply" if conf.source != "webhook" else "")
+                ),
                 kind="staff_confirmed",
                 track="triagex",
                 origin="webhook" if conf.source == "webhook" else "simulated_reply",

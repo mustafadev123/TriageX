@@ -187,9 +187,13 @@ class StaffingRequestView(BaseModel):
     requested_staff: int
     confirmed_staff: int
     usable_staff: int
+    proposal_tick: int
+    proposal_clock: str
     status: Literal["awaiting_replies", "partially_confirmed", "fully_confirmed", "expired"]
     approved_tick: int
+    approved_clock: str
     effective_tick: int
+    effective_clock: str
     end_tick: int
     approved_at: datetime
     expires_at: datetime

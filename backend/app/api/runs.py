@@ -25,8 +25,12 @@ class RunRequest(BaseModel):
 
 
 class ApproveRequest(BaseModel):
-    at_tick: int | None = Field(
-        default=None, description="Simulated approval time; defaults to the proposal tick"
+    at_tick: int = Field(
+        ge=0,
+        description=(
+            "Simulated tick at which the operator approved (the playhead position). "
+            "Required: the staffing lead time starts here, not at the proposal tick."
+        ),
     )
     operator: str = Field(default="demo-operator", max_length=64)
 
@@ -110,9 +114,8 @@ def get_diagnostics(request: Request, run_id: str) -> Diagnostics:
 
 @router.post("/runs/{run_id}/proposals/{proposal_id}/approve")
 async def approve_proposal(
-    request: Request, run_id: str, proposal_id: str, body: ApproveRequest | None = None
+    request: Request, run_id: str, proposal_id: str, body: ApproveRequest
 ) -> DashboardState:
-    body = body or ApproveRequest()
     service = _service(request)
     try:
         run, _ = service.approve_proposal(run_id, proposal_id, body.at_tick, body.operator)
