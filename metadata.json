@@ -1,0 +1,56 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M7C5XXZNAG0QADMKRA0SS14P",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "README.md",
+    "backend/app/api/health.py",
+    "backend/app/api/reference.py",
+    "backend/app/api/runs.py",
+    "backend/app/api/ws.py",
+    "backend/app/main.py",
+    "backend/app/models/dashboard.py",
+    "backend/app/services/dashboard.py",
+    "backend/app/services/demo_service.py",
+    "backend/app/simulation/comparison.py",
+    "backend/app/simulation/metrics.py",
+    "backend/app/simulation/scenarios.py",
+    "backend/tests/test_api_demo.py",
+    "docs/api.md",
+    "docs/plan.md",
+    "frontend/vite.config.ts",
+    "scripts/dev.ps1"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 56,
+    "cache_creation_tokens": 89530,
+    "cache_read_tokens": 7446342,
+    "output_tokens": 68263,
+    "api_call_count": 27
+  },
+  "redaction": {
+    "replacements": 12,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 3,
+      "entropy": 3,
+      "key_context": 6,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}

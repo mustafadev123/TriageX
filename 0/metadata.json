@@ -1,0 +1,64 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M7C5XXZNAG0QADMKRA0SS14P",
+  "session_id": "2aff9bc5-d6e7-4c3a-85e2-9c64d62c1aef",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-14T04:44:26.7551099Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "README.md",
+    "backend/app/api/health.py",
+    "backend/app/api/reference.py",
+    "backend/app/api/runs.py",
+    "backend/app/api/ws.py",
+    "backend/app/main.py",
+    "backend/app/models/dashboard.py",
+    "backend/app/services/dashboard.py",
+    "backend/app/services/demo_service.py",
+    "backend/app/simulation/comparison.py",
+    "backend/app/simulation/metrics.py",
+    "backend/app/simulation/scenarios.py",
+    "backend/tests/test_api_demo.py",
+    "docs/api.md",
+    "docs/plan.md",
+    "frontend/vite.config.ts",
+    "scripts/dev.ps1"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-2",
+  "turn_id": "b214f4713efb",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 56,
+    "cache_creation_tokens": 89530,
+    "cache_read_tokens": 7446342,
+    "output_tokens": 68263,
+    "api_call_count": 27
+  },
+  "session_token_usage": {
+    "input_tokens": 168,
+    "cache_creation_tokens": 374427,
+    "cache_read_tokens": 14248484,
+    "output_tokens": 203537,
+    "api_call_count": 78
+  },
+  "redaction": {
+    "replacements": 12,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 3,
+      "entropy": 3,
+      "key_context": 6,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 5
+  }
+}
