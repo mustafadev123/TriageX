@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 600" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .box{fill:#ffffff;stroke:#334155;stroke-width:1.4;rx:10}
+      .done{fill:#ecfdf5;stroke:#059669}
+      .part{fill:#fffbeb;stroke:#d97706}
+      .todo{fill:#f8fafc;stroke:#94a3b8;stroke-dasharray:6 4}
+      .ext{fill:#eff6ff;stroke:#2563eb}
+      .t{font-weight:700;font-size:14px;fill:#0f172a}
+      .s{fill:#334155;font-size:12px}
+      .l{fill:#475569;font-size:11.5px}
+      .e{stroke:#334155;stroke-width:1.4;fill:none;marker-end:url(#a)}
+      .ed{stroke:#64748b;stroke-width:1.3;fill:none;stroke-dasharray:5 4;marker-end:url(#a)}
+    </style>
+  </defs>
+
+  <!-- Browser -->
+  <rect class="box done" x="20" y="20" width="280" height="110"/>
+  <text class="t" x="36" y="44">React dashboard (frontend/)</text>
+  <text class="s" x="36" y="64">Vite 8 · React 19 · Recharts · Tailwind 4</text>
+  <text class="s" x="36" y="82">hooks/useDemo.ts: state, playhead, WS sync</text>
+  <text class="s" x="36" y="100">lib/demo.ts: spoiler-safe reveal logic</text>
+  <text class="s" x="36" y="118">:5173, proxies /api and /ws to :8000</text>
+
+  <!-- Backend -->
+  <rect class="box done" x="350" y="20" width="370" height="300"/>
+  <text class="t" x="366" y="44">FastAPI backend (backend/app/)</text>
+  <text class="s" x="366" y="66">api/runs.py: reset, state, approve, simulate-reply</text>
+  <text class="s" x="366" y="84">api/ws.py: /ws, broadcasts run.updated</text>
+  <text class="s" x="366" y="102">services/demo_service.py: DemoService, Run</text>
+  <text class="s" x="366" y="120">  _record_reply() → Run.recompute() (Track B only)</text>
+  <text class="s" x="366" y="138">services/dashboard.py: build_dashboard()</text>
+  <text class="s" x="366" y="156">simulation/: deterministic two-track engine</text>
+  <text class="s" x="366" y="174">repositories/persistence.py: background writer</text>
+  <rect class="box part" x="366" y="188" width="338" height="58"/>
+  <text class="s" x="378" y="208">api/chert.py + services/outreach.py + integrations/chert.py</text>
+  <text class="s" x="378" y="226">iMessage (console API): sends, signed webhook, dedup</text>
+  <text class="l" x="378" y="240">implemented + tested with fixtures; NOT live-verified</text>
+  <rect class="box todo" x="366" y="254" width="338" height="54"/>
+  <text class="s" x="378" y="274">PLANNED: api/facetime.py (card check, confirm)</text>
+  <text class="s" x="378" y="292">→ DemoService.confirm_live(), source "facetime"</text>
+
+  <!-- Tiger -->
+  <rect class="box ext" x="770" y="20" width="190" height="148"/>
+  <text class="t" x="786" y="44">Tiger Data</text>
+  <text class="s" x="786" y="64">PostgreSQL + TimescaleDB</text>
+  <text class="s" x="786" y="82">hospital_metrics hypertable</text>
+  <text class="s" x="786" y="100">runs, versions,</text>
+  <text class="s" x="786" y="118">confirmations, outreach</text>
+  <text class="s" x="786" y="136">and webhook events</text>
+  <text class="l" x="786" y="156">db/migrations/001–003</text>
+
+  <!-- Chert -->
+  <rect class="box ext" x="350" y="380" width="370" height="96"/>
+  <text class="t" x="366" y="404">Chert</text>
+  <text class="s" x="366" y="424">FaceTime calls API: POST /v1/calls, events, end</text>
+  <text class="s" x="366" y="442">Hackathon line messaging: /api/v1/shared-messages</text>
+  <text class="s" x="366" y="460">FaceTime bridge publishes caller audio/video tracks</text>
+
+  <!-- LiveKit -->
+  <rect class="box ext" x="770" y="250" width="190" height="96"/>
+  <text class="t" x="786" y="274">LiveKit Cloud room</text>
+  <text class="s" x="786" y="294">facetime-remote-audio</text>
+  <text class="s" x="786" y="312">facetime-remote-video</text>
+  <text class="l" x="786" y="332">(caller vision needs line opt-in)</text>
+
+  <!-- Agent -->
+  <rect class="box todo" x="20" y="250" width="280" height="110"/>
+  <text class="t" x="36" y="274">PLANNED: FaceTime agent (agent/)</text>
+  <text class="s" x="36" y="294">Node · @livekit/agents (chert new --video)</text>
+  <text class="s" x="36" y="312">samples frames, vision model reads card</text>
+  <text class="s" x="36" y="330">POSTs card fields + confirmation to FastAPI</text>
+  <text class="l" x="36" y="348">backend stays the authority for state</text>
+
+  <!-- iPhone -->
+  <rect class="box ext" x="770" y="420" width="190" height="96"/>
+  <text class="t" x="786" y="444">Teammate's iPhone</text>
+  <text class="s" x="786" y="464">verified with Chert</text>
+  <text class="s" x="786" y="482">FaceTime + iMessage</text>
+  <text class="s" x="786" y="500">shows fictional staff card</text>
+
+  <!-- edges -->
+  <path class="e" d="M300,60 L350,60"/>
+  <text class="l" x="304" y="54">REST</text>
+  <path class="e" d="M350,100 L300,100"/>
+  <text class="l" x="306" y="116">WS</text>
+  <path class="e" d="M720,80 L770,80"/>
+  <text class="l" x="724" y="74">SQL</text>
+  <path class="ed" d="M535,320 L535,380"/>
+  <text class="l" x="542" y="373">calls / sends</text>
+  <path class="ed" d="M720,440 L770,460"/>
+  <text class="l" x="726" y="482">FaceTime</text>
+  <path class="ed" d="M720,410 L800,346"/>
+  <text class="l" x="742" y="372">bridge</text>
+  <path class="ed" d="M800,346 L800,354 L302,354"/>
+  <text class="l" x="590" y="349">caller audio/video tracks</text>
+  <path class="ed" d="M300,330 L350,290"/>
+  <text class="l" x="20" y="378">agent → FastAPI: HTTP on localhost + agent token</text>
+
+  <!-- legend -->
+  <rect class="box done" x="20" y="540" width="18" height="14"/>
+  <text class="s" x="44" y="552">complete + tested</text>
+  <rect class="box part" x="170" y="540" width="18" height="14"/>
+  <text class="s" x="194" y="552">implemented, not live-verified</text>
+  <rect class="box todo" x="400" y="540" width="18" height="14"/>
+  <text class="s" x="424" y="552">not started (planned)</text>
+  <rect class="box ext" x="590" y="540" width="18" height="14"/>
+  <text class="s" x="614" y="552">external service / device</text>
+  <text class="l" x="20" y="584">Dashed arrows are planned or not yet live-verified paths. All hospital, patient and staff data are synthetic.</text>
+</svg>
