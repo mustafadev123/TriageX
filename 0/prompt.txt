@@ -1,0 +1,166 @@
+<pasted_content id="a80e">
+Phase 1 is approved.
+
+I have renamed the GitHub repository to TriageX, updated the Git remote, and enabled Entire. Please verify each of those before proceeding.
+
+Now:
+
+1. Run `git status` and verify no credentials, `.env` files, or virtual environments are staged.
+2. Re-run the backend and frontend tests.
+3. Stage and commit the Phase 1 implementation with the message `chore: initialize TriageX monorepo and development environment`.
+4. Verify the commit exists and inspect Entire's checkpoint/session tracking status.
+5. Report whether Entire successfully captured the Claude Code development session. Do not claim it did unless verified.
+6. Report the final Git status and commit hash.
+
+Do not begin Phase 2 yet. Wait for my approval.
+</pasted_content id="a80e">
+
+---
+
+it has been pushed
+
+---
+
+so do that
+
+---
+
+<pasted_content id="a80e">
+# TriageX — Approve Phase 2: Deterministic Simulation Engine
+
+Phase 1 is approved and complete. GitHub and Entire checkpoints are synced.
+
+You are now authorized to implement **Phase 2 only**, following `docs/plan.md`.
+
+## Objective
+
+Build a reproducible hospital surge simulation that supports our central demo:
+
+**One surge. Two futures.**
+
+The same synthetic patient arrivals and initial hospital conditions must produce two comparable tracks:
+
+- **Baseline:** Ordinary reactive hospital operations, including realistic diversion.
+- **With TriageX:** The same operations, plus explicitly approved and confirmed interventions.
+
+No artificial improvements, hardcoded outcomes, or hidden advantages.
+
+## Implementation requirements
+
+### 1. Hospital network
+
+Model the five Atlanta hospital locations already defined in our plan.
+
+Use synthetic staffing, treatment-space capacity, arrivals, and service times. Do not represent these values as actual hospital conditions.
+
+### 2. Simulation engine
+
+Implement the planned 15-minute tick engine, with a 24-hour simulation horizon and support for displaying a six-hour demo window.
+
+Use deterministic random generation and stable ordering.
+
+The engine must support identical replay from the same scenario, seed, and intervention list.
+
+### 3. Two simulation tracks
+
+Track A and Track B must be identical when no interventions exist.
+
+They must remain identical until a TriageX intervention actually becomes effective.
+
+### 4. Staffing intervention
+
+Use the Phase 0 plan's 45-minute simulated staffing lead time.
+
+A staff confirmation may increase staffed capacity only when physical treatment spaces are available.
+
+The intervention must not instantly reduce queues when the confirmation arrives.
+
+### 5. Surge scenarios
+
+Implement the four planned synthetic scenarios:
+
+- I-85 Multi-Vehicle Pileup
+- Big Game Downtown
+- Summer Heat Wave
+- Respiratory Wave
+
+Prioritize making the I-85 scenario credible and deterministic.
+
+### 6. Forecasting
+
+Implement the planned two-hour-ahead projection using only information available at the current simulated time.
+
+Forecasts must not inspect future patient arrivals.
+
+Keep forecasts separate from actual future outcomes.
+
+### 7. Computed metrics
+
+Calculate all results from simulation state and patient events.
+
+Include:
+
+- Hospital saturation
+- Queue lengths
+- Patient waiting times
+- Ambulance handoff waiting hours
+- Diversion events
+- Staff utilization
+- Intervention effectiveness
+
+Never hardcode percentage improvements.
+
+### 8. Demo-specific requirements
+
+The engine must support:
+
+- A shared timeline for both tracks.
+- A visible intervention approval time.
+- A 45-minute simulated lead-time window.
+- A shift-active marker.
+- Recalculation of Track B after a confirmation.
+- A six-hour view of the complete scenario.
+
+The eventual UI should be able to show two curves separating only after an intervention becomes effective.
+
+### 9. Testing
+
+Write meaningful automated tests covering:
+
+- Deterministic replay.
+- Baseline equality without interventions.
+- No effect before intervention activation.
+- Staffing constrained by physical capacity.
+- Correct ambulance handoff calculations.
+- Forecast isolation from future arrivals.
+- Consistent results across scenarios.
+
+Run pytest, Ruff, and any other applicable checks.
+
+## Important constraints
+
+- Do not begin Phase 3.
+- Do not modify frontend architecture.
+- Do not integrate Chert, Tiger Data, OpenAI, or Gemini yet.
+- Do not change the existing approved project structure without explaining why.
+- Preserve Entire tracking.
+- Keep the simulation independent of external APIs.
+- Do not manufacture favorable results.
+
+## Final report
+
+When finished, provide:
+
+1. Files created or modified.
+2. Simulation architecture.
+3. Example I-85 scenario output with actual computed metrics.
+4. Test results.
+5. Performance measurements.
+6. Known limitations.
+7. Whether the planned live demo is supported.
+8. Git commit hash and Entire checkpoint status.
+
+Commit Phase 2 as a separate Git checkpoint, push it, and verify that Entire synced successfully.
+
+**Stop after Phase 2 and wait for approval before proceeding.**
+</pasted_content id="a80e">
