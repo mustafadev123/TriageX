@@ -80,7 +80,7 @@ suites, and local Chert onboarding output. Nothing below is inferred from conver
 | Branches | `main` only (local and remote) |
 | `HEAD` and `origin/main` | `8c3be99` (identical: everything committed is pushed) |
 | Working tree at audit | clean (before this handoff document was added) |
-| Entire | `.entire/settings.json` enabled (git-refs checkpoints); 8 refs under `refs/entire/`; `entire checkpoint list --outgoing` reported nothing queued |
+| Entire | `.entire/settings.json` enabled (git-refs checkpoints, synced to `origin`); 9 refs under `refs/entire/` on GitHub as of `869e2fe`; `entire checkpoint list --outgoing` reported nothing queued. **Required for this project; see Section 8.5.** |
 
 Commit history (oldest first):
 
@@ -534,9 +534,8 @@ claude --version
 
 Python: you do not install it yourself. `uv sync` installs Python 3.12 from `backend/.python-version`.
 
-**Entire CLI (optional but used by this repo).** Install it from
-`https://docs.entire.io/cli/installation`, then check `entire --version`. The repository's Claude Code
-hooks (`.claude/settings.json`) call `entire` only when it is installed.
+**Entire CLI (required).** Install and enable it before your first Claude Code session; Section 8.5
+has the steps.
 
 ### 8.3 Clone and run the existing application
 
@@ -593,6 +592,61 @@ database as `not_configured`.
 - Keep the Mac awake during rehearsals and the demo with `caffeinate -dimsu`, and keep it on power.
 - The Mac's camera and microphone are not used: the iPhone is the FaceTime endpoint.
 - Keep the agent folder out of iCloud-synced folders such as Desktop and Documents, if those sync.
+
+### 8.5 Entire: session checkpoints (required for this project)
+
+Entire records each Claude Code session as a checkpoint tied to the commits it produced, and pushes
+those checkpoints to GitHub alongside the code. TriageX has used it since Phase 1, and the history of
+every phase is stored on GitHub under `refs/entire/*`. Keep this record going: it is the project's
+evidence of how the work was done.
+
+**What the repository already contains:**
+
+| File | Purpose |
+|---|---|
+| `.entire/settings.json` | Entire is enabled; checkpoints are stored as git refs (`"type": "git-refs"`) |
+| `.entire/.gitignore` | Keeps Entire's local working files out of Git |
+| `.claude/settings.json` | Claude Code hooks that call `entire` on session start, each prompt, stop and session end. They exit silently when `entire` is not installed, so **missing Entire breaks nothing visibly but records nothing.** |
+
+**What the repository cannot contain:**
+- **The Entire CLI.** You install it yourself.
+- **The local git hooks.** `entire enable` installs them into `.git/hooks`, and a clone never copies
+  `.git/hooks`. You must run `entire enable` once on your Mac after cloning.
+
+**Setup (macOS, once, from the repository root):**
+
+```bash
+# 1. Install (official Homebrew cask; it adds the entireio/tap tap automatically)
+brew install --cask entireio/tap/entire
+
+# 2. Verify both executables
+entire version
+command -v entire && command -v git-remote-entire
+
+# 3. Enable for this clone and install the Claude Code hooks (non-interactive)
+entire enable --agent claude-code
+
+# 4. Fetch the existing checkpoint history (a plain clone does not download refs/entire/*)
+git fetch origin 'refs/entire/*:refs/entire/*'
+
+# 5. Check
+entire status                       # expect: Enabled · Agents: Claude Code · Checkpoints sync to: origin
+entire checkpoint list              # shows checkpoints on the current branch
+```
+
+If `entire status` reports that you must sign in, run `entire login`. If anything looks wrong, run
+`entire doctor`. To update later: `brew upgrade --cask entireio/tap/entire`.
+
+**Daily use:**
+- Start Claude Code normally (`claude`); sessions are recorded automatically.
+- Checkpoints upload when you `git push`.
+- After every push, run `entire checkpoint list --outgoing`. It must report that nothing is queued for
+  `origin`. If something is queued, push again.
+- `entire checkpoint explain <id>` summarizes what a past session did, which is useful when picking
+  up someone else's work.
+
+**Push access:** checkpoints are pushed to the same GitHub repository, so you need collaborator (write)
+access, the same as for code.
 
 ---
 
@@ -704,6 +758,11 @@ STEPS
 2. Check tools: node --version (must be 22.23.2+ or 24.x), uv --version, git --version. If a tool is
    missing, print the exact Homebrew/installer command from Section 8.2 of the handoff and stop.
 3. If .env is missing: cp .env.example .env (do not fill secrets yourself; ask me).
+3b. Entire (required; handoff Section 8.5): check `entire version`. If it is missing, tell me to run
+   `brew install --cask entireio/tap/entire` and wait. Then run `entire enable --agent claude-code`
+   and `git fetch origin 'refs/entire/*:refs/entire/*'`, and confirm with `entire status`: Enabled,
+   agent Claude Code, checkpoints sync to origin. If it asks for sign-in, tell me to run
+   `entire login` myself. Report the number of checkpoints that `entire checkpoint list` shows.
 4. Backend: cd backend && uv sync && uv run pytest -q && uv run ruff check .
    Expected: 165 passed; ruff has 2 known errors in tests/test_chert.py (I001, E501 line 66).
    Fix only those two (uv run ruff check . --fix, then wrap the long line). Re-run until clean.
@@ -726,11 +785,13 @@ ACCEPTANCE CRITERIA
 - 165 backend tests pass, ruff clean, 20 frontend tests pass, lint and build clean.
 - Both servers start; /api/health returns status ok; reset returns run version 1.
 - I confirm the dashboard reaches 9.25 h after 3 simulated replies.
+- `entire status` shows Enabled with Claude Code, and checkpoints sync to origin.
 
-DELIVERABLES: a short status report (tools, versions, test counts, integration statuses).
+DELIVERABLES: a short status report (tools, versions, Entire status, test counts, integration
+statuses).
 GIT: show `git status` and the diff summary, ask me for approval, then commit
-"chore: macOS portability and lint fixes", push to origin main. If the `entire` CLI is installed, run
-`entire checkpoint list --outgoing` and report that nothing is queued.
+"chore: macOS portability and lint fixes", push to origin main. Run
+`entire checkpoint list --outgoing` and confirm that nothing is queued for origin.
 STOP after reporting. Do not start Chert onboarding.
 ```
 
@@ -1252,7 +1313,7 @@ and keep the human-readable ID as the primary signal.
 
 **Other:**
 - LiveKit Agents: `https://docs.livekit.io/agents/`
-- Entire CLI: `https://docs.entire.io/cli/installation`
+- Entire CLI: `https://docs.entire.com/cli/installation` (moved from docs.entire.io)
 - uv: `https://docs.astral.sh/uv/`
 
 *All hospital scenarios, patients, staff, cards and outcomes in TriageX are synthetic.*
