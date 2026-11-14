@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TriageX Test Cards</title>
+<!--
+  FICTIONAL test cards for the TriageX DEMO (handoff Section 13). Not real credentials.
+  Screen: click a card to show it full-screen (Esc or click again to exit).
+  Print: each card prints at 12 x 7.5 cm (Section 13 asks for at least 9 x 6 cm), on matte paper.
+  The test label under each card is NOT part of the card and is hidden in full-screen view, so the
+  vision model never sees a hint about whether a card is valid.
+-->
+<style>
+  :root { --ink: #0f172a; --teal: #0f766e; --teal-ink: #ccfbf1; --red: #b91c1c; --green: #047857; --amber: #b45309; --muted: #334155; --page: #f1f5f9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px; background: var(--page); color: var(--ink); font-family: Helvetica, Arial, sans-serif; }
+  header { max-width: 1040px; margin: 0 auto 20px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  header p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.4; }
+  .grid { max-width: 1040px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 28px 24px; }
+  figure { margin: 0; }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  figcaption b { color: var(--ink); }
+
+  /* The card. Sizes are in container units so the same card scales to any width (screen, full-screen, print). */
+  .card { container-type: inline-size; width: 100%; aspect-ratio: 16 / 10; background: #fff; border: 4px solid var(--ink); border-radius: 18px; overflow: hidden; cursor: zoom-in; display: flex; flex-direction: column; user-select: none; }
+  .card .head { background: var(--teal); color: #fff; display: flex; align-items: baseline; justify-content: space-between; padding: 3.2cqw 4.5cqw 2.6cqw; }
+  .card .brand { font-size: 7.4cqw; font-weight: 800; letter-spacing: 0.02em; }
+  .card .kind { font-size: 4cqw; font-weight: 700; color: var(--teal-ink); letter-spacing: 0.06em; }
+  .card .body { padding: 2.2cqw 4.5cqw 3cqw; display: flex; flex-direction: column; gap: 1.1cqw; flex: 1; }
+  .card .fict { font-size: 3.6cqw; font-weight: 800; color: var(--red); letter-spacing: 0.03em; }
+  .card .id { display: flex; align-items: baseline; gap: 2.4cqw; margin-top: 0.6cqw; }
+  .card .id small { font-size: 4.6cqw; color: #475569; font-weight: 700; }
+  .card .id strong { font-size: 10.6cqw; font-weight: 800; letter-spacing: 0.02em; line-height: 1; }
+  .card .name { font-size: 6.4cqw; font-weight: 700; }
+  .card .role { font-size: 4.6cqw; color: var(--muted); }
+  .card .avail { font-size: 6cqw; font-weight: 800; letter-spacing: 0.03em; }
+  .card .avail.ok { color: var(--green); }
+  .card .avail.off { color: var(--amber); }
+  .card .shift { font-size: 4cqw; color: var(--muted); }
+
+  /* Full-screen: the card fills the screen at 16:10, nothing else is visible. */
+  .card:fullscreen { cursor: zoom-out; width: min(96vw, 96vh * 1.6); height: auto; margin: auto; border-width: 6px; }
+  .card:fullscreen::backdrop { background: #fff; }
+  /* Fallback when the Fullscreen API is unavailable (some embedded browsers). */
+  body.zoomed .card.zoom { position: fixed; inset: 0; margin: auto; z-index: 10; width: min(96vw, 96vh * 1.6); height: auto; cursor: zoom-out; }
+  body.zoomed::after { content: ""; position: fixed; inset: 0; background: #fff; z-index: 9; }
+
+  @media print {
+    @page { margin: 12mm; }
+    body { background: #fff; padding: 0; }
+    header p.screen-only { display: none; }
+    .grid { display: block; max-width: none; }
+    figure { width: 120mm; display: inline-block; vertical-align: top; margin: 0 4mm 8mm 0; break-inside: avoid; }
+    .card { width: 120mm; border-width: 1mm; border-radius: 4mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>TriageX DEMO: fictional staff test cards</h1>
+  <p>Synthetic test material for a hackathon demo. These are not real credentials and name no real people.</p>
+  <p class="screen-only">Click a card to show it full-screen (Esc to exit). Print on matte paper; each card prints at 12 × 7.5 cm.</p>
+</header>
+
+<main class="grid" id="cards"></main>
+
+<script>
+  // The roster check happens in the backend (Prompt 4). The "test" labels below are for the person
+  // running the test and are rendered outside the card.
+  const CARDS = [
+    { id: 'TX-RN-1001', name: 'Avery (fictional RN)',  avail: 'AVAILABLE', shift: 'Surge shift 16:30–20:30 (simulated)', test: 'Valid: on the roster, available' },
+    { id: 'TX-RN-1002', name: 'Jordan (fictional RN)', avail: 'AVAILABLE', shift: 'Surge shift 16:30–20:30 (simulated)', test: 'Valid: on the roster, available' },
+    { id: 'TX-RN-1003', name: 'Morgan (fictional RN)', avail: 'AVAILABLE', shift: 'Surge shift 16:30–20:30 (simulated)', test: 'Valid: on the roster, available' },
+    { id: 'TX-RN-9999', name: 'Sam (fictional RN)',    avail: 'AVAILABLE', shift: 'Surge shift 16:30–20:30 (simulated)', test: 'Invalid: unknown ID, not on the roster' },
+    { id: 'TX-RN-1004', name: 'Riley (fictional RN)',  avail: 'OFF DUTY',  shift: 'No surge shift (simulated)',          test: 'Invalid: on the roster but OFF DUTY' },
+  ];
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  document.getElementById('cards').innerHTML = CARDS.map(c => `
+    <figure>
+      <div class="card" tabindex="0" role="button" aria-label="Show card ${esc(c.id)} full-screen">
+        <div class="head"><span class="brand">TriageX DEMO</span><span class="kind">STAFF CARD</span></div>
+        <div class="body">
+          <div class="fict">FICTIONAL · NOT A REAL CREDENTIAL</div>
+          <div class="id"><small>ID</small><strong>${esc(c.id)}</strong></div>
+          <div class="name">${esc(c.name)}</div>
+          <div class="role">Registered Nurse · Emergency</div>
+          <div class="avail ${c.avail === 'OFF DUTY' ? 'off' : 'ok'}">${esc(c.avail)}</div>
+          <div class="shift">${esc(c.shift)}</div>
+        </div>
+      </div>
+      <figcaption><b>${esc(c.id)}</b>: ${esc(c.test)}</figcaption>
+    </figure>`).join('');
+
+  function toggle(card) {
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    if (document.body.classList.contains('zoomed')) { unzoom(); return; }
+    if (card.requestFullscreen) {
+      card.requestFullscreen().catch(() => zoom(card));
+    } else {
+      zoom(card);
+    }
+  }
+  function zoom(card) { card.classList.add('zoom'); document.body.classList.add('zoomed'); }
+  function unzoom() { document.querySelectorAll('.card.zoom').forEach(c => c.classList.remove('zoom')); document.body.classList.remove('zoomed'); }
+  document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('click', () => toggle(card));
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(card); } });
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') unzoom(); });
+</script>
+</body>
+</html>

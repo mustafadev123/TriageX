@@ -14,12 +14,15 @@ No secrets and no phone numbers are recorded here. Times are US Eastern (UTC−5
 | Line provisioned | **VERIFIED** | `chert doctor`: line "Silas Thorne" available, routing configured, calls enabled, worker Mac checked in |
 | iPhone verified (iMessage code) | **VERIFIED** | Completed by the developer in Chert's onboarding; the line accepted two FaceTime Video calls from that iPhone (below) |
 | Hosted demo call (`demo_outcome`) | **SKIPPED** | Not run: it proves nothing about our agent and costs trial minutes. The local onboarding record is an expired pre-sign-in session; setup was already complete when checked |
-| Trial | **ACTIVE** | `chert doctor`: 47 of 50 FaceTime minutes left after two test calls; "trial line stays yours until your trial ends" |
+| Trial | **ACTIVE** | `chert doctor`: 42 of 50 FaceTime minutes left after three test calls; "trial line stays yours until your trial ends" |
 | LiveKit Cloud (own project) | **VERIFIED** | `chert doctor`: "LiveKit accepted the credentials"; `doctor --agent`: agent joined a test room in 1.2 s. Chert-managed LiveKit: `livekit_not_provisioned` |
 | Voice model | **VERIFIED** | Gemini Live `gemini-2.5-flash-native-audio-preview-12-2025`, Gemini API free tier, via `@livekit/agents-plugin-google` 1.8.0 (replaces the starter's paid OpenAI realtime model) |
 | Two-way voice with our agent | **VERIFIED** (logs) | Call 1, below. Subjective audio quality not yet reported by the caller |
 | Caller camera capture (`facetime-remote-video`) | **VERIFIED** | Call 2, below. Enabled on this line without a request to Chert |
 | Our agent receives real caller frames | **VERIFIED** | Call 2: 609 frames, luminance follows the camera |
+| Vision model for cards | **VERIFIED** | `gemini-3.5-flash-lite` (`VISION_MODEL`), Gemini API free tier, same key. Listed by `GET /v1beta/models` for the key; Google's model page: stable, image input, structured output. Free-tier limit measured: **15 requests/min per model** |
+| Staff-card recognition from live FaceTime video | **VERIFIED** | Call 3: 5 different cards read with the exact `card_id` (1001, 1002, 1003, 9999, 1004); blank screen gave `card_present=false`; 45 s timeout fired |
+| Card validation against the roster | **PENDING** | Prompt 4 (the backend decides; the agent only extracts) |
 | Outbound FaceTime (agent places the call) | **UNKNOWN** | Not tested; needs a project API key and `POST /api/v1/calls` (handoff Section 6.4, Phase D2) |
 | Project API key / `CHERT_LINE_ID` in `.env` | **PENDING** | Not needed for inbound calls via `chert dev`; needed for outbound calls and the shared-line iMessage adapter (Prompt 5) |
 
@@ -61,7 +64,46 @@ Findings:
   to the centre and require two consistent reads.
 - On hang-up the track is muted, and the probe reports `no_current_frame` rather than an old frame.
 
+## Call 3: staff-card recognition (12:19:39–12:24:41, about 5 min)
+
+FaceTime Video from the verified iPhone to our agent (`CARD_AUTO_RESCAN=1`, so the scan re-armed
+6 s after each read). The caller pointed the iPhone's camera at the cards from
+`docs/handoff/cards.html`, shown full-screen on a monitor (printed cards are for the demo).
+`chert dev`: `call_accepted` in 0.1 s (warm), `call_bridge_ready` after 6.4 s, `call_media`: video and
+audio from our agent, `call_ended`. Fields only below; no image was stored.
+
+| Card shown | Accepted `card_id` | Other fields as read | Confidence | First sighting → accepted |
+|---|---|---|---|---|
+| TX-RN-1001 | **TX-RN-1001** | name "Fictional RN", role "Nurse - Emergency", AVAILABLE, shift "06:30-20:30 (simulated)" | 1.0, 1.0 | 12:20:01 → 12:20:03 |
+| TX-RN-1002 | **TX-RN-1002** | Jordan (fictional RN), AVAILABLE, shift "arge shift 16:30–20:30 (simulated)" | 0.99, 0.99 | 12:21:02 → 12:21:02 |
+| TX-RN-1003 | **TX-RN-1003** | Morgan (fictional RN), Registered Nurse · Emergency, AVAILABLE, Surge shift 16:30–20:30 (simulated) | 1.0, 0.99 | 12:21:11 → 12:21:12 |
+| TX-RN-9999 | **TX-RN-9999** (read as printed; rejection is Prompt 4) | Sam (fictional RN), AVAILABLE | 0.99, 0.99 | 12:22:18 → 12:22:19 |
+| TX-RN-1004 (OFF DUTY) | **TX-RN-1004** | Riley (fictional RN), **OFF DUTY**, No surge shift (simulated) | 1.0, 1.0 | 12:23:05 → 12:23:13 |
+| Blank screen | none: `card_present=false` on every sample (12:24:07–12:24:27) | — | 0 | voice nudge "hold the card up" twice; scan timed out at 45 s (12:24:08) |
+
+- Every accepted reading had `header_says_triagex_demo=true` and two consecutive samples with the same
+  ID at confidence ≥ 0.8. All 34 applied model results had either the correct `card_id` or null
+  (13 null: no card in view). Another 24 results arrived after a newer sample and were dropped
+  unlogged; the agent now logs their fields too.
+- Before each card appeared the model returned `card_present=false` (12:19:51–12:20:01); a card still in
+  view after being read was ignored by the re-armed scan, and the next card replaced it within 1–2 samples.
+- Secondary text is less reliable than the ID when a monitor is filmed (1001's name and shift, 1002's
+  shift). The backend should match on `card_id` only and take name, role and shift from the roster.
+- Model latency per request: 1.3–15.0 s (median 3.7 s, 58 results).
+- Not tested live: covered lens (handled locally as "too dark", unit-tested), camera turned off, and
+  printed cards (the demo will use printed cards).
+
+Problems found, fixed after the call (unit-tested, `npm test` 38/38, **not yet re-verified on a call**):
+1. **Free-tier rate limit.** Sampling once a second with up to 4 requests in flight exceeded the
+   free tier's 15 requests/min; five 429s each paused sampling for the server's retry delay (up to
+   about 56 s; after 1001 nothing was sampled for 49 s). Now requests come from a client-side budget
+   (14/min, burst 3, `VISION_RPM`), and an unchanged empty scene that just gave "no card" is not sent
+   again for 8 s, so the budget is full when a card appears.
+2. **Gemini Live called `scan_staff_card` on its own** five times,
+   restarting scans in progress. A scan already running is now left alone.
+3. A control character (U+0010) appeared inside one role string; control characters are now removed.
+
 ## Next
 
-Prompt 3: live staff-card recognition from these frames (one frame per second while awaiting a
-card), using a vision model on the Gemini API free tier.
+Prompt 4: send the accepted card fields to FastAPI, which checks `card_id` against
+`backend/app/data/staff_roster.json` (1001–1003 accepted, 9999 unknown, 1004 off duty).

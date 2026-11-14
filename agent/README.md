@@ -6,10 +6,21 @@ TriageX. All data is synthetic. Differences from the starter:
 - **Voice model:** Gemini Live via `@livekit/agents-plugin-google` 1.8.0 (free tier of the Gemini
   API, `GOOGLE_API_KEY`) instead of OpenAI realtime. Model:
   `gemini-2.5-flash-native-audio-preview-12-2025`, overridable with `GEMINI_LIVE_MODEL`.
-- **Frame probe:** `frame-probe.mjs` subscribes to the caller's `facetime-remote-video` track and
-  logs `[probe]` lines once per second (frame size, timestamp, fps, mean luminance) plus track
-  events. Numbers only: no frame is stored or forwarded. `FRAME_PROBE=0` disables it.
-- **Not yet:** staff-card recognition and backend confirmation (handoff Prompts 3 and 4).
+- **Staff-card reading** (`card-session.mjs`, `card-reader.mjs`, `frame-utils.mjs`, `vision.mjs`):
+  while a scan is active ("awaiting card"), at most one frame per second from the caller's
+  `facetime-remote-video` track is centre-cropped (80 %, dropping FaceTime controls and self-preview),
+  downscaled to a 1024 px grayscale PNG **in memory**, and sent to `VISION_MODEL`
+  (default `gemini-3.5-flash-lite`, same `GOOGLE_API_KEY`) with a strict JSON schema. A reading is
+  accepted only when the same `card_id` comes back in 2 consecutive samples with confidence ≥ 0.8;
+  otherwise the agent asks the caller (by voice) to hold the card closer, steadier, out of glare, or to
+  turn the camera on. A scan times out after 45 s. The scan starts with the greeting; the caller can ask
+  to scan again (`scan_staff_card` tool). Logs are `[card]` lines with text fields only; no frame is ever
+  written to disk. **The agent only extracts fields; the backend validates cards (Prompt 4).**
+- **Why a separate vision call:** `@livekit/agents-plugin-google` 1.8.0 does not forward video to
+  Gemini Live (`pushVideo` is a no-op), so the voice model never sees the camera.
+- **Frame probe:** `frame-probe.mjs` (Stage C evidence) now runs only with `FRAME_PROBE=1`.
+- **Tests:** `npm test` (Node's built-in runner; recorded model outputs in `test/fixtures/`, no images).
+- **Not yet:** backend roster check and confirmation (handoff Prompt 4).
 
 Run (Node 24): `npm start` in one terminal; in a second terminal, from this folder,
 `npx --yes @trychert/facetime@0.1.0-beta.21 dev --agent triagex-facetime-agent --minutes 30`.
@@ -97,7 +108,7 @@ FaceTime call by Chert yet: watch the media line in `chert dev` on your first ca
 
 ## What it does not do
 
-- It does not look at the caller's camera.
+- The starter did not look at the caller's camera; TriageX's card reader (above) does.
 - The waiting room shows that the agent joined LiveKit. It does not verify the
   model key or the media path. The first call does.
 - Never commit or share `.env.local`. LiveKit and model usage may cost money.

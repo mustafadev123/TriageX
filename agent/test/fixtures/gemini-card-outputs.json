@@ -1,0 +1,47 @@
+{
+  "_comment": "Raw JSON text returned by gemini-3.5-flash-lite (generateContent, CARD_SCHEMA) on 2026-11-14 for synthetic 1280x720 scenes rendered from docs/handoff/cards.html (offline, before any call). Fields only: no images are stored. The scenes are fictional test cards.",
+  "outputs": [
+    {
+      "scene": "s1001",
+      "description": "TX-RN-1001 card, 560 px wide, rotated -4°",
+      "model": "gemini-3.5-flash-lite",
+      "raw": "{\n  \"card_present\": true,\n  \"header_says_triagex_demo\": true,\n  \"card_id\": \"TX-RN-1001\",\n  \"name\": \"Avery (fictional RN)\",\n  \"role\": \"Registered Nurse · Emergency\",\n  \"availability\": \"AVAILABLE\",\n  \"shift\": \"Surge shift 16:30–20:30 (simulated)\",\n  \"confidence\": 1\n}"
+    },
+    {
+      "scene": "s1001g",
+      "description": "TX-RN-1001 card with a white glare patch over the ID",
+      "model": "gemini-3.5-flash-lite",
+      "raw": "{\n  \"card_present\": true,\n  \"header_says_triagex_demo\": true,\n  \"card_id\": null,\n  \"name\": \"Avery (fictional RN)\",\n  \"role\": \"Registered Nurse · Emergency\",\n  \"availability\": \"AVAILABLE\",\n  \"shift\": \"Surge shift 16:30–20:30 (simulated)\",\n  \"confidence\": 0.0\n}"
+    },
+    {
+      "scene": "s1002",
+      "description": "TX-RN-1002 card, 420 px wide, rotated 6°",
+      "model": "gemini-3.5-flash-lite",
+      "raw": "{\n  \"card_present\": true,\n  \"header_says_triagex_demo\": true,\n  \"card_id\": \"TX-RN-1002\",\n  \"name\": \"Jordan (fictional RN)\",\n  \"role\": \"Registered Nurse · Emergency\",\n  \"availability\": \"AVAILABLE\",\n  \"shift\": \"Surge shift 16:30–20:30 (simulated)\",\n  \"confidence\": 1.0\n}"
+    },
+    {
+      "scene": "s1003m",
+      "description": "TX-RN-1003 card, mirrored horizontally",
+      "model": "gemini-3.5-flash-lite",
+      "raw": "{\n  \"card_present\": true,\n  \"header_says_triagex_demo\": true,\n  \"card_id\": \"TX-RN-1003\",\n  \"name\": \"Morgan (Fictional RN)\",\n  \"role\": \"Registered Nurse • Emergency\",\n  \"availability\": \"AVAILABLE\",\n  \"shift\": \"Large shift 16:30–20:30 (simulated)\",\n  \"confidence\": 0.95\n}"
+    },
+    {
+      "scene": "s1004",
+      "description": "TX-RN-1004 OFF DUTY card, 700 px wide",
+      "model": "gemini-3.5-flash-lite",
+      "raw": "{\n  \"card_present\": true,\n  \"header_says_triagex_demo\": true,\n  \"card_id\": \"TX-RN-1004\",\n  \"name\": \"Riley (fictional RN)\",\n  \"role\": \"Registered Nurse · Emergency\",\n  \"availability\": \"OFF DUTY\",\n  \"shift\": \"No surge shift (simulated)\",\n  \"confidence\": 1.0\n}"
+    },
+    {
+      "scene": "s9999",
+      "description": "TX-RN-9999 card, 380 px wide, rotated -9°",
+      "model": "gemini-3.5-flash-lite",
+      "raw": "{\n  \"card_present\": true,\n  \"header_says_triagex_demo\": true,\n  \"card_id\": \"TX-RN-9999\",\n  \"name\": \"Sam (fictional RN)\",\n  \"role\": \"Registered Nurse · Emergency\",\n  \"availability\": \"AVAILABLE\",\n  \"shift\": \"Surge shift 16:30–20:30 (simulated)\",\n  \"confidence\": 1.0\n}"
+    },
+    {
+      "scene": "sblank",
+      "description": "blank sheet of paper and a hand, no card",
+      "model": "gemini-3.5-flash-lite",
+      "raw": "{\n  \"card_present\": false,\n  \"header_says_triagex_demo\": false,\n  \"card_id\": null,\n  \"name\": null,\n  \"role\": null,\n  \"availability\": null,\n  \"shift\": null,\n  \"confidence\": 0\n}"
+    }
+  ]
+}

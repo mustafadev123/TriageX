@@ -8,8 +8,9 @@
   },
   "scripts": {
     "start": "node --env-file=.env.local agent.mjs start",
-    "check": "node --check chert-rooms.mjs && node --check frame-probe.mjs && node --check agent.mjs && node --check face.mjs && node --check greet.mjs",
-    "help": "node agent.mjs --help"
+    "check": "node --check chert-rooms.mjs && node --check frame-probe.mjs && node --check agent.mjs && node --check face.mjs && node --check greet.mjs && node --check card-reader.mjs && node --check card-session.mjs && node --check frame-utils.mjs && node --check vision.mjs",
+    "help": "node agent.mjs --help",
+    "test": "node --test 'test/*.test.mjs'"
   },
   "dependencies": {
     "@livekit/agents": "1.8.0",

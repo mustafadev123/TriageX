@@ -1,0 +1,12 @@
+{
+  "_comment": "SYNTHETIC roster for the TriageX DEMO. Every person here is fictional; card IDs map to DEMO_STAFF in app/services/demo_service.py. TX-RN-9999 is deliberately absent (unknown-card rejection test). The backend, not the agent, validates cards against this file.",
+  "version": 1,
+  "staff": [
+    {"card_id": "TX-RN-1001", "staff_id": "rn-avery",  "name": "Avery (fictional RN)",  "role": "Registered Nurse", "unit": "Emergency", "availability": "AVAILABLE", "shift": "Surge shift 16:30–20:30 (simulated)"},
+    {"card_id": "TX-RN-1002", "staff_id": "rn-jordan", "name": "Jordan (fictional RN)", "role": "Registered Nurse", "unit": "Emergency", "availability": "AVAILABLE", "shift": "Surge shift 16:30–20:30 (simulated)"},
+    {"card_id": "TX-RN-1003", "staff_id": "rn-morgan", "name": "Morgan (fictional RN)", "role": "Registered Nurse", "unit": "Emergency", "availability": "AVAILABLE", "shift": "Surge shift 16:30–20:30 (simulated)"},
+    {"card_id": "TX-RN-1004", "staff_id": "rn-riley",  "name": "Riley (fictional RN)",  "role": "Registered Nurse", "unit": "Emergency", "availability": "OFF DUTY",  "shift": null},
+    {"card_id": "TX-RN-1005", "staff_id": "rn-casey",  "name": "Casey (fictional RN)",  "role": "Registered Nurse", "unit": "Emergency", "availability": "AVAILABLE", "shift": "Surge shift 16:30–20:30 (simulated)"},
+    {"card_id": "TX-RN-1006", "staff_id": "rn-quinn",  "name": "Quinn (fictional RN)",  "role": "Registered Nurse", "unit": "Emergency", "availability": "AVAILABLE", "shift": "Surge shift 16:30–20:30 (simulated)"}
+  ]
+}
