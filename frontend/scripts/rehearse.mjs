@@ -6,6 +6,17 @@
 //   (backend on 127.0.0.1:8000 and `npm run dev` running)
 //   npm run rehearse -- <outDir> [width] [height]      e.g. npm run rehearse -- ../docs/screenshots 1366 768
 //   REHEARSE_CHANNEL=chrome npm run rehearse -- /tmp/rehearsal 1366 768   (macOS, Google Chrome)
+//
+// How the staff confirmations arrive (REHEARSE_CONFIRM):
+//   simulated (default)  click the labeled "Simulate staff reply" button three times
+//   live                 after approval, wait up to REHEARSE_LIVE_WAIT s (default 240) for real
+//                        FaceTime / iMessage confirmations (a teammate calls the line), then fill
+//                        the rest with labeled simulated replies; times each live confirmation
+//   agent                drive the FaceTime agent API directly (card 9999 rejected, 1001 + "I
+//                        confirm") with TRIAGEX_AGENT_TOKEN from ../.env: tests the backend path
+//                        without a phone; reported as "agent API, no phone", never as a live call
+// REHEARSE_BRIEF=0 skips generating the AI brief at 16:30. A JSON summary is written to outDir.
+import { readFileSync, writeFileSync } from 'node:fs'
 import { chromium } from 'playwright-core'
 
 const [outDir = 'rehearsal', w = '1366', h = '768'] = process.argv.slice(2)
@@ -22,7 +33,31 @@ const note = (msg) => {
   console.log(line)
 }
 
-const channel = process.env.REHEARSE_CHANNEL || 'msedge'
+const channel = process.env.REHEARSE_CHANNEL || (process.platform === 'darwin' ? 'chrome' : 'msedge')
+const MODE = process.env.REHEARSE_CONFIRM || 'simulated'
+if (!['simulated', 'live', 'agent'].includes(MODE)) throw new Error(`REHEARSE_CONFIRM must be simulated, live or agent`)
+const LIVE_WAIT_S = Number(process.env.REHEARSE_LIVE_WAIT || 240)
+const summary = { mode: MODE, width, height, started_at: new Date().toISOString(), live: [], simulated_ms: [] }
+
+/** TRIAGEX_AGENT_TOKEN from the environment or the repo's .env (never printed). */
+function agentToken() {
+  if (process.env.TRIAGEX_AGENT_TOKEN) return process.env.TRIAGEX_AGENT_TOKEN
+  try {
+    const line = readFileSync(new globalThis.URL('../../.env', import.meta.url), 'utf8').split('\n').find((l) => l.startsWith('TRIAGEX_AGENT_TOKEN='))
+    return line ? line.slice('TRIAGEX_AGENT_TOKEN='.length).trim() : ''
+  } catch {
+    return ''
+  }
+}
+const agentApi = async (path, body) => {
+  const r = await fetch(`${URL.replace(/\/$/, '')}/api/agent${path}`, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'content-type': 'application/json', 'x-triagex-agent-token': agentToken() },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  return { status: r.status, body: await r.json().catch(() => null) }
+}
+const apiState = () => page.evaluate(async () => (await fetch('/api/demo/state')).json())
 const browser = await chromium.launch({ channel, headless: true })
 const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 })
 const consoleErrors = []
@@ -76,10 +111,65 @@ const approveVisible = await page.getByRole('button', { name: 'Approve outreach'
 note(`after Next at 16:30, approve button still visible (not auto-approved): ${approveVisible}`)
 await page.getByRole('button', { name: 'Approve outreach', exact: true }).click()
 await page.getByTestId('confirmed-count').waitFor()
+const approvedAt = Date.now()
 await shot('3-approval')
 
+if (process.env.REHEARSE_BRIEF !== '0') {
+  const t = Date.now()
+  await page.getByRole('button', { name: /^Generate/ }).click()
+  await page.getByTestId('brief').waitFor({ timeout: 40000 })
+  const badge = await page.locator('[data-testid="brief"] span').first().innerText()
+  summary.brief = { provider: badge, ms: Date.now() - t }
+  note(`AI brief at 16:30: ${badge} in ${Date.now() - t} ms`)
+  await shot('3b-brief')
+  await page.getByRole('button', { name: 'Close brief' }).click()
+}
+
+const confirmedNow = async () => Number((await page.getByTestId('confirmed-count').innerText()).trim().split('/')[0])
+
+if (MODE === 'agent') {
+  if (!agentToken()) throw new Error('REHEARSE_CONFIRM=agent needs TRIAGEX_AGENT_TOKEN (env or ../.env)')
+  const call = `rehearsal-${Date.now()}`
+  await agentApi('/call', { call_id: call, event: 'connected' })
+  const card = (id, name) => ({ call_id: call, card_id: id, name, role: 'Registered Nurse · Emergency', availability: 'AVAILABLE', confidence: 0.99 })
+  const bad = await agentApi('/card-check', card('TX-RN-9999', 'Sam (fictional RN)'))
+  note(`agent API (no phone): TX-RN-9999 -> ${bad.body?.reason}`)
+  const good = await agentApi('/card-check', card('TX-RN-1001', 'Avery (fictional RN)'))
+  note(`agent API (no phone): TX-RN-1001 -> ${good.body?.reason}`)
+  const t = Date.now()
+  const conf = await agentApi('/confirm', { call_id: call, card_id: 'TX-RN-1001', verbal_confirmation: 'I confirm' })
+  await page.waitForFunction(() => document.querySelector('[data-testid="confirmed-count"]')?.textContent?.startsWith('1'), null, { timeout: 5000 })
+  summary.live.push({ channel: 'agent API (no phone)', confirm_to_dashboard_ms: Date.now() - t, result: conf.body?.reason })
+  note(`agent API confirm -> dashboard shows 1/3 after ${Date.now() - t} ms`)
+  await agentApi('/call', { call_id: call, event: 'ended' })
+} else if (MODE === 'live') {
+  note(`waiting up to ${LIVE_WAIT_S} s for live FaceTime / iMessage confirmations…`)
+  const deadline = approvedAt + LIVE_WAIT_S * 1000
+  let seen = 0
+  while (Date.now() < deadline) {
+    const state = await apiState()
+    const req = state.staffing_requests[0]
+    const live = (req?.confirmations ?? []).filter((c) => c.source !== 'simulated')
+    for (const c of live.slice(seen)) {
+      const feed = state.feed.filter((e) => e.origin === 'facetime').map((e) => e.title)
+      summary.live.push({ channel: c.source, after_approval_s: Math.round((Date.now() - approvedAt) / 100) / 10, feed })
+      note(`live confirmation via ${c.source} (${c.display_name}) ${((Date.now() - approvedAt) / 1000).toFixed(1)} s after approval; FaceTime feed: ${feed.join(' > ')}`)
+    }
+    seen = live.length
+    if (seen >= (req?.requested_staff ?? 3) || req?.status === 'expired') break
+    const notice = await page.getByTestId('fallback-notice').innerText().catch(() => null)
+    if (notice && !summary.fallback_notice) {
+      summary.fallback_notice = notice
+      note(`dashboard fallback notice: ${notice}`)
+    }
+    await page.waitForTimeout(1000)
+    if (seen > 0 && Date.now() - approvedAt > 60_000 + 30_000 * seen) break
+  }
+  if (seen === 0) note('no live confirmation arrived: the rest uses the labeled simulated fallback')
+}
+
 const replyTimes = []
-for (let i = 1; i <= 3; i++) {
+for (let i = (await confirmedNow()) + 1; i <= 3; i++) {
   // Measured inside the page: click -> confirmed counter shows the new value on screen.
   const ms = await page.evaluate(
     (n) =>
@@ -144,4 +234,14 @@ note(`final hero on screen ${finalSaved} h (API impact.primary.delta captured be
 note(`machine time for the full walkthrough: ${demoSeconds.toFixed(1)} s`)
 note(`reply round trips (click -> UI updated): ${replyTimes.join(', ')} ms`)
 note(`console errors: ${consoleErrors.length ? consoleErrors.join(' | ') : 'none'}`)
+Object.assign(summary, {
+  simulated_ms: replyTimes,
+  final_hero: finalSaved,
+  api_delta: apiFinal,
+  machine_seconds: Number(demoSeconds.toFixed(1)),
+  layout_fits: layout.scrollW <= layout.w && layout.scrollH <= layout.h,
+  console_errors: consoleErrors,
+})
+writeFileSync(`${outDir}/summary-${width}x${height}.json`, JSON.stringify(summary, null, 2))
+note(`summary written to ${outDir}/summary-${width}x${height}.json`)
 await browser.close()
