@@ -22,8 +22,8 @@ No secrets and no phone numbers are recorded here. Times are US Eastern (UTC−5
 | Our agent receives real caller frames | **VERIFIED** | Call 2: 609 frames, luminance follows the camera |
 | Vision model for cards | **VERIFIED** | `gemini-3.5-flash-lite` (`VISION_MODEL`), Gemini API free tier, same key. Listed by `GET /v1beta/models` for the key; Google's model page: stable, image input, structured output. Free-tier limit measured: **15 requests/min per model** |
 | Staff-card recognition from live FaceTime video | **VERIFIED** | Call 3: 5 different cards read with the exact `card_id` (1001, 1002, 1003, 9999, 1004); blank screen gave `card_present=false`; 45 s timeout fired |
-| Card validation + "I confirm" → dashboard (Prompt 4) | **BUILT, live call PENDING** | Backend, agent and dashboard tested (pytest, agent and vitest suites); over real HTTP the agent client got 9999 rejected, 1004 off duty, 1001 valid → confirmed once (repeat = duplicate); the dashboard updated 48–68 ms after the confirm call. Token set in both files. Call 4 (14:05–14:06 ET, about 1 min, made before outreach was approved): the agent's authenticated calls reached the backend (`POST /api/agent/call` 200 ×3; `GET /api/agent/active-request` correctly 404 with no open request); 11 samples, no card shown, 45 s timeout. The card → "I confirm" path is still to be tested on a call |
-| Shared-line iMessage (Prompt 5) | **BUILT, live PENDING** | Adapter tested with mocked HTTP. Keys are in `.env`; the backend health check reported `ok` (a real authenticated `GET /shared-messages` succeeded). Responses come wrapped as `{data: {items, total, limit, offset}, request_id}` (seen live, now parsed); per-message field names are still unknown because the line had no messages. The response shape of `/shared-messages` is undocumented: run `scripts/chert_inspect.py` first. Trial lines may only reply within 24 h of a phone's last text |
+| Card validation + "I confirm" → dashboard (Prompt 4) | **VERIFIED** (valid card) | Call 7, below: TX-RN-1001 read from live video, roster check valid, "I confirm" heard in the caller's words, one `facetime` confirmation recorded (recompute 11 ms). Live rejection of 9999 not yet observed (only in automated runs) |
+| Shared-line iMessage (Prompt 5) | **BLOCKED by the trial** | Real send refused: `HTTP 403: On a free trial the agent only replies: this phone has not texted in the last 24 hours.` Workaround: the iPhone texts the line first, then approve. Key accepted; responses wrapped as `{data: {items, total, limit, offset}, request_id}` |
 | AI operational brief (Prompt 6) | **VERIFIED** (real Gemini API, local run) | Real Gemini briefs: primary `gemini-3.1-flash-lite` (≈1 s), forced primary failure → fallback `gemini-3.5-flash-lite` with the reason shown; a real primary timeout also fell back visibly. Needs `GEMINI_API_KEY` in `.env` for the dashboard |
 | Outbound FaceTime (agent places the call) | **SKIPPED** | Out of scope by decision on 2026-11-14 |
 | Project API key / `CHERT_LINE_ID` in `.env` | **PENDING** | Not needed for inbound calls via `chert dev`; needed for outbound calls and the shared-line iMessage adapter (Prompt 5) |
@@ -104,6 +104,23 @@ Problems found, fixed after the call (unit-tested, `npm test` 38/38, **not yet r
 2. **Gemini Live called `scan_staff_card` on its own** five times,
    restarting scans in progress. A scan already running is now left alone.
 3. A control character (U+0010) appeared inside one role string; control characters are now removed.
+
+## Calls 5–7: team end-to-end session (15:17–15:31 ET, `chert dev` slot to 15:43)
+
+Fields only. Outreach approved at 16:30 (tick 18) at 15:17:31.
+
+| Call | Time (ET) | Bridge ready | Result |
+|---|---|---|---|
+| 5 | 15:19:35–15:19:54 | 7 s | Ended after about 12 s; no card read |
+| 6 | 15:20:39–15:21:32 | 6 s | No stable reading; 45 s scan timeout |
+| 7 | 15:22:36–15:23:57 | 7 s | **TX-RN-1001** read (2 consecutive samples, header TriageX DEMO) → backend `valid` → caller said "I confirm" → **1/3 confirmed, source `facetime`** (staff `rn-avery`) |
+
+- iMessage outreach at each approval: refused by Chert (trial rule above), so the remaining
+  confirmations used the labeled simulated fallback; in a second run three simulated replies and
+  an AI brief (Gemini primary, 1.5 s).
+- Bug found and fixed: after the valid card, Gemini Live called `scan_staff_card` on its own and
+  the same card was read and checked a second time (harmless; still one confirmation). The tool now
+  refuses to rescan while a confirmation is pending.
 
 ## Next
 

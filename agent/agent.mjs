@@ -144,6 +144,11 @@ const agent = defineAgent({
       execute: async ({ different_card }) => {
         // In the live test Gemini Live called this tool on its own several times, which restarted
         // scans in progress. A scan that is already running is left alone.
+        // Live test 2026-11-14: right after a valid card it was called again, re-reading the same
+        // card while the agent waited for "I confirm". Never rescan while a confirmation is pending.
+        if (pendingConfirm && Date.now() < pendingConfirm.until && !different_card) {
+          return 'The card was already checked and is on the roster. Do not scan again: ask the caller to say "I confirm".';
+        }
         if (reader.state === 'awaiting') {
           return 'The scanner is already reading the camera. Ask the caller to keep the card 20 to 30 centimetres from the camera and still. Do not state any card details until the scanner reports them.';
         }
