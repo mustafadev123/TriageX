@@ -260,8 +260,6 @@ diversions (−30%).
 
 ## 4. System architecture
 
-![TriageX architecture](handoff/architecture.svg)
-
 ### 4.1 Components
 
 | Component | Implementation | Key paths |
