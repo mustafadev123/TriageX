@@ -1,6 +1,6 @@
-# TriageX — Devpost submission draft
+# TriageX — Devpost write-up
 
-**Category to select:** Best Use of FaceTime (Chert). Also the Healthcare track.
+**Tracks entered:** Best Use of FaceTime (Chert), Healthcare. **Won:** Best Use of Entire.
 
 **Tagline:** Every ER capacity tool shows you the problem. TriageX calls the people who can fix it.
 
