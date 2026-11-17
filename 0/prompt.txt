@@ -1,0 +1,11 @@
+so we won emory hacks 2026 with this idea .can you update the readme of the project like give  it a proper professional look making arch diagrams whrever needed since people will be loooking at the repo .
+
+---
+
+so we won the best use case of entire /docs/handoff/architecture.svg still shows FaceTime and the AI brief as "planned"
+
+remove this
+
+---
+
+yes.
